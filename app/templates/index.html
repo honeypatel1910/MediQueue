@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}MediQueue | Project Foundation{% endblock %}
+
+{% block content %}
+<section class="hero-card">
+    <p class="text-uppercase text-primary fw-semibold small mb-2">MSc project foundation</p>
+    <h1 class="display-5 fw-bold mb-3">MediQueue</h1>
+    <p class="lead mb-4">
+        A web-based GP appointment and prescription management system. This first milestone
+        establishes the Flask application structure, configuration, extensions and base UI.
+    </p>
+    <div class="d-flex gap-2 flex-wrap">
+        <span class="badge text-bg-primary">Flask</span>
+        <span class="badge text-bg-secondary">SQLAlchemy</span>
+        <span class="badge text-bg-secondary">Flask-Login</span>
+        <span class="badge text-bg-secondary">CSRF Protection</span>
+    </div>
+</section>
+{% endblock %}
