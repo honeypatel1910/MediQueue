@@ -4,6 +4,14 @@ from app.config import Config
 from app.extensions import csrf, db, login_manager, migrate
 
 
+@login_manager.user_loader
+def load_user(user_id):
+    """Load the logged-in user from the session for Flask-Login."""
+    from app.models import User
+
+    return db.session.get(User, int(user_id))
+
+
 def create_app(config_class=Config):
     """Create and configure the MediQueue Flask application."""
     app = Flask(__name__)
