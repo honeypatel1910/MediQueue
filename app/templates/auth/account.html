@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Account | MediQueue{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <p class="text-uppercase text-primary fw-semibold small mb-2">Authentication milestone</p>
+                <h1 class="h3 fw-bold mb-3">Signed in successfully</h1>
+                <p class="text-muted">
+                    The project currently supports login, logout, seeded demo users and patient registration.
+                    Role-specific dashboards will be added in future chunks.
+                </p>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Name</dt>
+                    <dd class="col-sm-8">{{ current_user.full_name }}</dd>
+                    <dt class="col-sm-4">Email</dt>
+                    <dd class="col-sm-8">{{ current_user.email }}</dd>
+                    <dt class="col-sm-4">Role</dt>
+                    <dd class="col-sm-8">{{ current_user.role.name }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

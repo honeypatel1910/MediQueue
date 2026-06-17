@@ -9,7 +9,10 @@ def load_user(user_id):
     """Load the logged-in user from the session for Flask-Login."""
     from app.models import User
 
-    return db.session.get(User, int(user_id))
+    try:
+        return db.session.get(User, int(user_id))
+    except (TypeError, ValueError):
+        return None
 
 
 def create_app(config_class=Config):
@@ -24,6 +27,12 @@ def create_app(config_class=Config):
 
     login_manager.login_view = "auth.login"
     login_manager.login_message_category = "warning"
+
+    from app.commands import register_commands
+    from app.auth import bp as auth_bp
+
+    register_commands(app)
+    app.register_blueprint(auth_bp)
 
     @app.route("/")
     def index():

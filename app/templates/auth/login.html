@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Log in | MediQueue{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <h1 class="h3 fw-bold mb-3">Log in</h1>
+                <p class="text-muted">Use one of the seeded demo accounts or a registered patient account.</p>
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control", placeholder="patient@mediqueue.health") }}
+                        {% for error in form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control", placeholder="Enter password") }}
+                        {% for error in form.password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ form.remember(class="form-check-input") }}
+                        {{ form.remember.label(class="form-check-label") }}
+                    </div>
+                    {{ form.submit(class="btn btn-primary w-100") }}
+                </form>
+                <hr>
+                <p class="mb-0 small">No patient account yet? <a href="{{ url_for('auth.register') }}">Register here</a>.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
