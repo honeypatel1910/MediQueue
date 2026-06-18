@@ -1,43 +1,12 @@
 # MediQueue
 
-MediQueue is a web-based GP appointment and prescription management system being developed as an MSc project.
+MediQueue is an MSc project prototype for a local GP appointment and prescription management system.
 
-## Current milestone
+## Overview
 
-This commit combines the database seeding milestone with the first authentication milestone.
+The application currently provides a secure Flask foundation with user roles, demo accounts, patient registration, patient login, and patient profile management.
 
-Included so far:
-
-- Flask application factory
-- Environment-based configuration
-- SQLAlchemy database extension setup
-- Flask-Migrate setup
-- Flask-Login setup
-- CSRF protection setup
-- Base template and simple landing page
-- Health endpoint at `/health`
-- `Role` database model
-- `User` database model
-- Password hashing and password checking helpers
-- Flask-Login user loader
-- Database CLI commands
-- Seeded demo users for Patient, Doctor, Nurse and Practice Admin
-- Login page
-- Logout flow
-- Patient registration page
-- Simple signed-in account page
-- Role protection decorator for future modules
-
-Not included yet:
-
-- Patient/staff profile detail pages
-- Role-specific dashboards
-- Appointment workflows
-- Prescription workflows
-- React frontend
-- Tests
-
-## Local setup
+## Setup
 
 Create and activate a virtual environment:
 
@@ -52,13 +21,7 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Optional environment setup:
-
-```bash
-copy .env.example .env
-```
-
-Reset and seed the local database:
+Create and seed the local database:
 
 ```bash
 flask --app run.py reset-db --yes
@@ -76,15 +39,21 @@ Open:
 http://127.0.0.1:5000
 ```
 
-Check health endpoint:
+## Health endpoint
 
 ```text
 http://127.0.0.1:5000/health
 ```
 
+Expected response:
+
+```json
+{"service":"MediQueue","status":"ok"}
+```
+
 ## Demo accounts
 
-After running `flask --app run.py reset-db --yes`, use these accounts:
+After running `flask --app run.py reset-db --yes`, use:
 
 | Role | Email | Password |
 |---|---|---|
@@ -93,27 +62,16 @@ After running `flask --app run.py reset-db --yes`, use these accounts:
 | Nurse | nurse@mediqueue.health | NursePass123! |
 | Patient | patient@mediqueue.health | PatientPass123! |
 
-You can verify seeded accounts with:
+Check seeded accounts:
 
 ```bash
 flask --app run.py check-logins
 ```
 
-## Expected behaviour in this milestone
+## Current patient flow
 
-The app should run and allow users to:
-
-- Open the landing page
-- Check the `/health` endpoint
-- Create/reset the local database
-- Seed demo users
-- Log in with demo accounts
-- Register a new patient account
-- Log out
-- View a simple signed-in account page
-
-The website will still look simple because dashboards and feature modules come in later milestones.
-
-## Next milestone
-
-The next commit will add patient profile and patient dashboard backend functionality.
+1. A patient can register.
+2. A patient profile is created automatically during registration.
+3. A patient can log in.
+4. A patient is redirected to the patient dashboard.
+5. A patient can update phone, date of birth, and address from the profile page.

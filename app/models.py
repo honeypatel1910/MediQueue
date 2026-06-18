@@ -36,6 +36,12 @@ class User(UserMixin, db.Model):
 
     role_id = db.Column(db.Integer, db.ForeignKey("roles.id"), nullable=False)
     role = db.relationship("Role", back_populates="users")
+    patient_profile = db.relationship(
+        "PatientProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     @property
     def is_active(self):
@@ -57,3 +63,22 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f"<User {self.email}>"
+
+
+class PatientProfile(db.Model):
+    """Patient-specific details linked to a login account."""
+
+    __tablename__ = "patients"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    phone = db.Column(db.String(30))
+    date_of_birth = db.Column(db.Date)
+    address = db.Column(db.String(255))
+    patient_reference = db.Column(db.String(50), unique=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", back_populates="patient_profile")
+
+    def __repr__(self):
+        return f"<PatientProfile {self.patient_reference or self.id}>"

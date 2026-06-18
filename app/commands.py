@@ -2,7 +2,7 @@ import click
 from flask import current_app
 
 from app.extensions import db
-from app.models import Role, User
+from app.models import PatientProfile, Role, User
 
 
 DEFAULT_ROLES = [
@@ -40,6 +40,8 @@ DEMO_USERS = [
         "first_name": "Sam",
         "last_name": "Taylor",
         "role": "Patient",
+        "phone": "07123 456789",
+        "address": "12 Riverside Road, Leicester",
     },
 ]
 
@@ -53,8 +55,24 @@ def seed_roles() -> None:
     db.session.commit()
 
 
+def _ensure_patient_profile(user: User, item: dict) -> None:
+    """Create a patient profile for patient demo accounts."""
+    if not user.has_role("Patient"):
+        return
+
+    if user.patient_profile is None:
+        user.patient_profile = PatientProfile(
+            phone=item.get("phone"),
+            address=item.get("address"),
+            patient_reference=f"MQP-{user.id or 0:05d}",
+        )
+    else:
+        user.patient_profile.phone = user.patient_profile.phone or item.get("phone")
+        user.patient_profile.address = user.patient_profile.address or item.get("address")
+
+
 def seed_demo_users() -> None:
-    """Create demo accounts for each role if they do not exist."""
+    """Create demo accounts and a patient profile if they do not exist."""
     seed_roles()
     roles = {role.name: role for role in Role.query.all()}
 
@@ -70,7 +88,16 @@ def seed_demo_users() -> None:
             )
             user.set_password(item["password"])
             db.session.add(user)
+            db.session.flush()
 
+        _ensure_patient_profile(user, item)
+
+    db.session.commit()
+
+    # Assign stable reference after IDs are available.
+    for user in User.query.join(Role).filter(Role.name == "Patient").all():
+        if user.patient_profile and not user.patient_profile.patient_reference:
+            user.patient_profile.patient_reference = f"MQP-{user.id:05d}"
     db.session.commit()
 
 
@@ -85,10 +112,10 @@ def register_commands(app):
 
     @app.cli.command("seed-data")
     def seed_data_command():
-        """Seed roles and demo users."""
+        """Seed roles, demo users and patient profile data."""
         db.create_all()
         seed_demo_users()
-        click.echo("Seeded roles and demo users.")
+        click.echo("Seeded roles, demo users and patient profile data.")
         click.echo("Demo accounts:")
         for item in DEMO_USERS:
             click.echo(f"- {item['email']} / {item['password']} ({item['role']})")
@@ -99,6 +126,8 @@ def register_commands(app):
         for item in DEMO_USERS:
             user = User.query.filter_by(email=item["email"]).first()
             status = "available" if user and user.check_password(item["password"]) else "missing or invalid"
+            if user and user.has_role("Patient") and user.patient_profile is None:
+                status = f"{status}, patient profile missing"
             click.echo(f"{item['email']}: {status}")
 
     @app.cli.command("reset-db")

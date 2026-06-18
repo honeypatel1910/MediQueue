@@ -3,7 +3,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 
 from app.auth.forms import LoginForm, RegistrationForm
 from app.extensions import db
-from app.models import Role, User
+from app.models import PatientProfile, Role, User
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -17,10 +17,17 @@ def _get_or_create_patient_role():
     return role
 
 
+def _post_login_redirect(user):
+    """Send patients to the new patient dashboard; other roles use account page for now."""
+    if user.has_role("Patient"):
+        return redirect(url_for("patients.dashboard"))
+    return redirect(url_for("auth.account"))
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("auth.account"))
+        return _post_login_redirect(current_user)
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -31,7 +38,9 @@ def login():
             login_user(user, remember=form.remember.data)
             flash("You are now logged in.", "success")
             next_page = request.args.get("next")
-            return redirect(next_page or url_for("auth.account"))
+            if next_page:
+                return redirect(next_page)
+            return _post_login_redirect(user)
 
         flash("Invalid email or password.", "danger")
 
@@ -41,7 +50,7 @@ def login():
 @bp.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("auth.account"))
+        return _post_login_redirect(current_user)
 
     form = RegistrationForm()
     if form.validate_on_submit():
@@ -55,6 +64,8 @@ def register():
         )
         user.set_password(form.password.data)
         db.session.add(user)
+        db.session.flush()
+        user.patient_profile = PatientProfile(patient_reference=f"MQP-{user.id:05d}")
         db.session.commit()
 
         flash("Patient account created. You can now log in.", "success")

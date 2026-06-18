@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Patient Dashboard | MediQueue{% endblock %}
+
+{% block content %}
+<div class="row g-4 align-items-stretch">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-4">
+                <p class="text-uppercase text-primary fw-semibold small mb-2">Patient Dashboard</p>
+                <h1 class="h3 fw-bold mb-3">Welcome, {{ current_user.first_name }}</h1>
+                <p class="text-muted mb-4">
+                    Manage your MediQueue patient account and keep your personal details up to date.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="fw-semibold">Appointments</div>
+                            <div class="small text-muted">No upcoming appointments.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="fw-semibold">Prescriptions</div>
+                            <div class="small text-muted">No active prescription requests.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="fw-semibold">Notifications</div>
+                            <div class="small text-muted">No new notifications.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Patient details</h2>
+                <dl class="mb-4 small">
+                    <dt>Reference</dt>
+                    <dd>{{ profile.patient_reference or "Not assigned" }}</dd>
+                    <dt>Email</dt>
+                    <dd>{{ current_user.email }}</dd>
+                    <dt>Phone</dt>
+                    <dd>{{ profile.phone or "Not added yet" }}</dd>
+                    <dt>Address</dt>
+                    <dd>{{ profile.address or "Not added yet" }}</dd>
+                </dl>
+                <a class="btn btn-primary w-100" href="{{ url_for('patients.profile') }}">Update Profile</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
