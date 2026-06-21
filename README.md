@@ -1,35 +1,29 @@
 # MediQueue
 
-MediQueue is an MSc project prototype for a local GP appointment and prescription management system.
+MediQueue is a secure web-based GP appointment and prescription management system developed with Flask.
 
-## Overview
+## Current functionality
 
-The application currently provides a secure Flask foundation with user roles, demo accounts, patient registration, patient login, and patient profile management.
+- Flask application factory structure
+- Environment-based configuration
+- SQLAlchemy database setup
+- User and role models
+- Patient profile model
+- Staff profile and professional registration models
+- Seeded demo users for patient, doctor, nurse and practice admin roles
+- Login, logout and patient registration
+- Role-based routing
+- Patient dashboard and profile management
+- Doctor and nurse staff dashboard
+- Practice admin dashboard overview
 
 ## Setup
-
-Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-```
-
-Install dependencies:
-
-```bash
 pip install -r requirements.txt
-```
-
-Create and seed the local database:
-
-```bash
 flask --app run.py reset-db --yes
-```
-
-Run the app:
-
-```bash
 python run.py
 ```
 
@@ -39,21 +33,7 @@ Open:
 http://127.0.0.1:5000
 ```
 
-## Health endpoint
-
-```text
-http://127.0.0.1:5000/health
-```
-
-Expected response:
-
-```json
-{"service":"MediQueue","status":"ok"}
-```
-
 ## Demo accounts
-
-After running `flask --app run.py reset-db --yes`, use:
 
 | Role | Email | Password |
 |---|---|---|
@@ -62,16 +42,10 @@ After running `flask --app run.py reset-db --yes`, use:
 | Nurse | nurse@mediqueue.health | NursePass123! |
 | Patient | patient@mediqueue.health | PatientPass123! |
 
-Check seeded accounts:
+## Useful commands
 
 ```bash
+flask --app run.py reset-db --yes
+flask --app run.py seed-data
 flask --app run.py check-logins
 ```
-
-## Current patient flow
-
-1. A patient can register.
-2. A patient profile is created automatically during registration.
-3. A patient can log in.
-4. A patient is redirected to the patient dashboard.
-5. A patient can update phone, date of birth, and address from the profile page.

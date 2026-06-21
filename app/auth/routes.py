@@ -18,9 +18,13 @@ def _get_or_create_patient_role():
 
 
 def _post_login_redirect(user):
-    """Send patients to the new patient dashboard; other roles use account page for now."""
+    """Send users to the dashboard for their role."""
     if user.has_role("Patient"):
         return redirect(url_for("patients.dashboard"))
+    if user.has_role("Doctor", "Nurse"):
+        return redirect(url_for("staff.dashboard"))
+    if user.has_role("Practice Admin"):
+        return redirect(url_for("admin.dashboard"))
     return redirect(url_for("auth.account"))
 
 

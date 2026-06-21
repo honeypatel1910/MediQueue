@@ -19,16 +19,15 @@
                 <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
                     {% if current_user.is_authenticated %}
                         {% if current_user.has_role('Patient') %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('patients.dashboard') }}">Patient Dashboard</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('patients.profile') }}">Profile</a>
-                            </li>
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('patients.dashboard') }}">Patient Dashboard</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('patients.profile') }}">Profile</a></li>
+                        {% elif current_user.has_role('Doctor', 'Nurse') %}
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.dashboard') }}">Staff Dashboard</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.profile') }}">Staff Profile</a></li>
+                        {% elif current_user.has_role('Practice Admin') %}
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a></li>
                         {% else %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('auth.account') }}">Account</a>
-                            </li>
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.account') }}">Account</a></li>
                         {% endif %}
                         <li class="nav-item">
                             <span class="navbar-text small text-muted">{{ current_user.full_name }}</span>

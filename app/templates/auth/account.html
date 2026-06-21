@@ -9,9 +9,7 @@
             <div class="card-body p-4">
                 <p class="text-uppercase text-primary fw-semibold small mb-2">MediQueue Account</p>
                 <h1 class="h3 fw-bold mb-3">Signed in successfully</h1>
-                <p class="text-muted">
-                    Your MediQueue account details are shown below.
-                </p>
+                <p class="text-muted">Your MediQueue account details are shown below.</p>
                 <dl class="row mb-4">
                     <dt class="col-sm-4">Name</dt>
                     <dd class="col-sm-8">{{ current_user.full_name }}</dd>
@@ -23,6 +21,10 @@
 
                 {% if current_user.has_role('Patient') %}
                     <a class="btn btn-primary" href="{{ url_for('patients.dashboard') }}">Go to Patient Dashboard</a>
+                {% elif current_user.has_role('Doctor', 'Nurse') %}
+                    <a class="btn btn-primary" href="{{ url_for('staff.dashboard') }}">Go to Staff Dashboard</a>
+                {% elif current_user.has_role('Practice Admin') %}
+                    <a class="btn btn-primary" href="{{ url_for('admin.dashboard') }}">Go to Admin Dashboard</a>
                 {% endif %}
             </div>
         </div>

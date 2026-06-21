@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Dashboard | MediQueue{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-primary fw-semibold small mb-2">Clinical Staff</p>
+        <h1 class="h3 fw-bold mb-1">Welcome, {{ current_user.first_name }}</h1>
+        <p class="text-muted mb-0">Manage your MediQueue staff profile and clinical workspace.</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{{ url_for('staff.profile') }}">Edit Staff Profile</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Staff Details</h2>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Name</dt>
+                    <dd class="col-sm-8">{{ current_user.full_name }}</dd>
+                    <dt class="col-sm-4">Role</dt>
+                    <dd class="col-sm-8">{{ current_user.role.name }}</dd>
+                    <dt class="col-sm-4">Job Title</dt>
+                    <dd class="col-sm-8">{{ profile.job_title }}</dd>
+                    <dt class="col-sm-4">Department</dt>
+                    <dd class="col-sm-8">{{ profile.department or 'Clinical Services' }}</dd>
+                    <dt class="col-sm-4">Extension</dt>
+                    <dd class="col-sm-8">{{ profile.phone_extension or 'Not set' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Professional Registration</h2>
+                {% if profile.professional_register %}
+                    <dl class="mb-0">
+                        <dt>Register</dt>
+                        <dd>{{ profile.professional_register.register_name }}</dd>
+                        <dt>Registration Number</dt>
+                        <dd>{{ profile.professional_register.registration_number }}</dd>
+                        <dt>Status</dt>
+                        <dd>
+                            {% if profile.professional_register.verified %}
+                                <span class="badge text-bg-success">Verified</span>
+                            {% else %}
+                                <span class="badge text-bg-secondary">Pending</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                {% else %}
+                    <p class="text-muted mb-0">No professional registration details are linked to this staff account.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

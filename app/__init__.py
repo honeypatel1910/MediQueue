@@ -31,10 +31,14 @@ def create_app(config_class=Config):
     from app.commands import register_commands
     from app.auth import bp as auth_bp
     from app.patients import patients_bp
+    from app.staff import staff_bp
+    from app.admin import admin_bp
 
     register_commands(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(patients_bp)
+    app.register_blueprint(staff_bp)
+    app.register_blueprint(admin_bp)
 
     @app.route("/")
     def index():

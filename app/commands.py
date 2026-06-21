@@ -2,7 +2,7 @@ import click
 from flask import current_app
 
 from app.extensions import db
-from app.models import PatientProfile, Role, User
+from app.models import PatientProfile, ProfessionalRegister, Role, StaffProfile, User
 
 
 DEFAULT_ROLES = [
@@ -26,6 +26,11 @@ DEMO_USERS = [
         "first_name": "Aisha",
         "last_name": "Khan",
         "role": "Doctor",
+        "job_title": "General Practitioner",
+        "department": "Clinical Services",
+        "phone_extension": "201",
+        "register_name": "GMC",
+        "registration_number": "GMC-7654321",
     },
     {
         "email": "nurse@mediqueue.health",
@@ -33,6 +38,11 @@ DEMO_USERS = [
         "first_name": "Emily",
         "last_name": "Brown",
         "role": "Nurse",
+        "job_title": "Practice Nurse",
+        "department": "Nursing Team",
+        "phone_extension": "204",
+        "register_name": "NMC",
+        "registration_number": "NMC-2345678",
     },
     {
         "email": "patient@mediqueue.health",
@@ -71,8 +81,33 @@ def _ensure_patient_profile(user: User, item: dict) -> None:
         user.patient_profile.address = user.patient_profile.address or item.get("address")
 
 
+def _ensure_staff_profile(user: User, item: dict) -> None:
+    """Create staff profile and registration data for doctor and nurse demo accounts."""
+    if not user.has_role("Doctor", "Nurse"):
+        return
+
+    if user.staff_profile is None:
+        user.staff_profile = StaffProfile(
+            job_title=item.get("job_title", user.role.name),
+            department=item.get("department"),
+            phone_extension=item.get("phone_extension"),
+        )
+        db.session.flush()
+    else:
+        user.staff_profile.job_title = user.staff_profile.job_title or item.get("job_title", user.role.name)
+        user.staff_profile.department = user.staff_profile.department or item.get("department")
+        user.staff_profile.phone_extension = user.staff_profile.phone_extension or item.get("phone_extension")
+
+    if user.staff_profile.professional_register is None:
+        user.staff_profile.professional_register = ProfessionalRegister(
+            register_name=item.get("register_name", "Clinical Register"),
+            registration_number=item.get("registration_number", "Pending"),
+            verified=True,
+        )
+
+
 def seed_demo_users() -> None:
-    """Create demo accounts and a patient profile if they do not exist."""
+    """Create demo accounts and role-specific profile data if they do not exist."""
     seed_roles()
     roles = {role.name: role for role in Role.query.all()}
 
@@ -91,10 +126,10 @@ def seed_demo_users() -> None:
             db.session.flush()
 
         _ensure_patient_profile(user, item)
+        _ensure_staff_profile(user, item)
 
     db.session.commit()
 
-    # Assign stable reference after IDs are available.
     for user in User.query.join(Role).filter(Role.name == "Patient").all():
         if user.patient_profile and not user.patient_profile.patient_reference:
             user.patient_profile.patient_reference = f"MQP-{user.id:05d}"
@@ -112,10 +147,10 @@ def register_commands(app):
 
     @app.cli.command("seed-data")
     def seed_data_command():
-        """Seed roles, demo users and patient profile data."""
+        """Seed roles, demo users and profile data."""
         db.create_all()
         seed_demo_users()
-        click.echo("Seeded roles, demo users and patient profile data.")
+        click.echo("Seeded roles, demo users and profile data.")
         click.echo("Demo accounts:")
         for item in DEMO_USERS:
             click.echo(f"- {item['email']} / {item['password']} ({item['role']})")
@@ -128,6 +163,8 @@ def register_commands(app):
             status = "available" if user and user.check_password(item["password"]) else "missing or invalid"
             if user and user.has_role("Patient") and user.patient_profile is None:
                 status = f"{status}, patient profile missing"
+            if user and user.has_role("Doctor", "Nurse") and user.staff_profile is None:
+                status = f"{status}, staff profile missing"
             click.echo(f"{item['email']}: {status}")
 
     @app.cli.command("reset-db")

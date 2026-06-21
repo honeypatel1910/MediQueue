@@ -42,6 +42,12 @@ class User(UserMixin, db.Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    staff_profile = db.relationship(
+        "StaffProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     @property
     def is_active(self):
@@ -82,3 +88,45 @@ class PatientProfile(db.Model):
 
     def __repr__(self):
         return f"<PatientProfile {self.patient_reference or self.id}>"
+
+
+class StaffProfile(db.Model):
+    """Doctor or nurse details linked to a login account."""
+
+    __tablename__ = "staff_profiles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    job_title = db.Column(db.String(120), nullable=False)
+    department = db.Column(db.String(120))
+    phone_extension = db.Column(db.String(30))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", back_populates="staff_profile")
+    professional_register = db.relationship(
+        "ProfessionalRegister",
+        back_populates="staff_profile",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self):
+        return f"<StaffProfile {self.job_title} {self.user_id}>"
+
+
+class ProfessionalRegister(db.Model):
+    """Professional registration details for clinical staff."""
+
+    __tablename__ = "professional_registers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    staff_profile_id = db.Column(db.Integer, db.ForeignKey("staff_profiles.id"), unique=True, nullable=False)
+    register_name = db.Column(db.String(50), nullable=False)
+    registration_number = db.Column(db.String(80), nullable=False)
+    verified = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    staff_profile = db.relationship("StaffProfile", back_populates="professional_register")
+
+    def __repr__(self):
+        return f"<ProfessionalRegister {self.register_name} {self.registration_number}>"

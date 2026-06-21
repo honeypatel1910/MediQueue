@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Practice Admin Dashboard | MediQueue{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
+    <h1 class="h3 fw-bold mb-1">MediQueue administration dashboard</h1>
+    <p class="text-muted mb-0">View the current user and role structure for the local GP system.</p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Total Users</p>
+                <p class="h3 fw-bold mb-0">{{ total_users }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Active Users</p>
+                <p class="h3 fw-bold mb-0">{{ active_users }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Patients</p>
+                <p class="h3 fw-bold mb-0">{{ total_patients }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <p class="text-muted small mb-1">Clinical Staff</p>
+                <p class="h3 fw-bold mb-0">{{ total_staff }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Recent Users</h2>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in recent_users %}
+                                <tr>
+                                    <td>{{ user.full_name }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>{{ user.role.name }}</td>
+                                    <td>
+                                        {% if user.active %}
+                                            <span class="badge text-bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-muted">No users found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Configured Roles</h2>
+                <div class="list-group list-group-flush">
+                    {% for role in roles %}
+                        <div class="list-group-item px-0">
+                            <div class="fw-semibold">{{ role.name }}</div>
+                            <div class="text-muted small">{{ role.description }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
