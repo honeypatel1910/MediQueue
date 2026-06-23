@@ -109,6 +109,12 @@ class StaffProfile(db.Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    availability_blocks = db.relationship(
+        "AvailabilityBlock",
+        back_populates="staff_profile",
+        cascade="all, delete-orphan",
+        order_by="AvailabilityBlock.available_date.asc()",
+    )
 
     def __repr__(self):
         return f"<StaffProfile {self.job_title} {self.user_id}>"
@@ -130,3 +136,55 @@ class ProfessionalRegister(db.Model):
 
     def __repr__(self):
         return f"<ProfessionalRegister {self.register_name} {self.registration_number}>"
+
+
+class AvailabilityBlock(db.Model):
+    """A clinical staff availability window used to generate appointment slots."""
+
+    __tablename__ = "availability_blocks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    staff_profile_id = db.Column(db.Integer, db.ForeignKey("staff_profiles.id"), nullable=False, index=True)
+    available_date = db.Column(db.Date, nullable=False, index=True)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    slot_duration_minutes = db.Column(db.Integer, default=20, nullable=False)
+    location = db.Column(db.String(120), default="GP Practice", nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    staff_profile = db.relationship("StaffProfile", back_populates="availability_blocks")
+    slots = db.relationship(
+        "AppointmentSlot",
+        back_populates="availability_block",
+        cascade="all, delete-orphan",
+        order_by="AppointmentSlot.start_at.asc()",
+    )
+
+    @property
+    def slot_count(self):
+        return len(self.slots or [])
+
+    def __repr__(self):
+        return f"<AvailabilityBlock {self.available_date} {self.start_time}-{self.end_time}>"
+
+
+class AppointmentSlot(db.Model):
+    """A bookable appointment slot generated from staff availability."""
+
+    __tablename__ = "appointment_slots"
+
+    id = db.Column(db.Integer, primary_key=True)
+    availability_block_id = db.Column(db.Integer, db.ForeignKey("availability_blocks.id"), nullable=False, index=True)
+    start_at = db.Column(db.DateTime, nullable=False, index=True)
+    end_at = db.Column(db.DateTime, nullable=False)
+    status = db.Column(db.String(30), default="Available", nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    availability_block = db.relationship("AvailabilityBlock", back_populates="slots")
+
+    @property
+    def staff_profile(self):
+        return self.availability_block.staff_profile if self.availability_block else None
+
+    def __repr__(self):
+        return f"<AppointmentSlot {self.start_at} {self.status}>"

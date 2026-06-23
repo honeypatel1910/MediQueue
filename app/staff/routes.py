@@ -3,9 +3,10 @@ from flask_login import current_user, login_required
 
 from app.decorators import role_required
 from app.extensions import db
-from app.models import ProfessionalRegister, StaffProfile
+from app.models import AppointmentSlot, AvailabilityBlock, ProfessionalRegister, StaffProfile
+from app.services import generate_slots_for_availability
 from app.staff import staff_bp
-from app.staff.forms import StaffProfileForm
+from app.staff.forms import AvailabilityForm, StaffProfileForm
 
 
 def ensure_staff_profile(user):
@@ -32,7 +33,25 @@ def ensure_staff_profile(user):
 @role_required("Doctor", "Nurse")
 def dashboard():
     profile = ensure_staff_profile(current_user)
-    return render_template("staff/dashboard.html", profile=profile)
+    availability_count = AvailabilityBlock.query.filter_by(staff_profile_id=profile.id).count()
+    available_slot_count = (
+        AppointmentSlot.query.join(AvailabilityBlock)
+        .filter(AvailabilityBlock.staff_profile_id == profile.id, AppointmentSlot.status == "Available")
+        .count()
+    )
+    upcoming_blocks = (
+        AvailabilityBlock.query.filter_by(staff_profile_id=profile.id)
+        .order_by(AvailabilityBlock.available_date.asc(), AvailabilityBlock.start_time.asc())
+        .limit(5)
+        .all()
+    )
+    return render_template(
+        "staff/dashboard.html",
+        profile=profile,
+        availability_count=availability_count,
+        available_slot_count=available_slot_count,
+        upcoming_blocks=upcoming_blocks,
+    )
 
 
 @staff_bp.route("/profile", methods=["GET", "POST"])
@@ -51,3 +70,34 @@ def profile():
         return redirect(url_for("staff.profile"))
 
     return render_template("staff/profile.html", form=form, profile=profile)
+
+
+@staff_bp.route("/availability", methods=["GET", "POST"])
+@login_required
+@role_required("Doctor", "Nurse")
+def availability():
+    profile = ensure_staff_profile(current_user)
+    form = AvailabilityForm()
+
+    if form.validate_on_submit():
+        block = AvailabilityBlock(
+            staff_profile=profile,
+            available_date=form.available_date.data,
+            start_time=form.start_time.data,
+            end_time=form.end_time.data,
+            slot_duration_minutes=form.slot_duration_minutes.data,
+            location=form.location.data or "GP Practice",
+        )
+        db.session.add(block)
+        db.session.flush()
+        slots = generate_slots_for_availability(block)
+        db.session.commit()
+        flash(f"Availability created with {len(slots)} appointment slots.", "success")
+        return redirect(url_for("staff.availability"))
+
+    blocks = (
+        AvailabilityBlock.query.filter_by(staff_profile_id=profile.id)
+        .order_by(AvailabilityBlock.available_date.desc(), AvailabilityBlock.start_time.asc())
+        .all()
+    )
+    return render_template("staff/availability.html", form=form, blocks=blocks)
