@@ -85,6 +85,12 @@ class PatientProfile(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship("User", back_populates="patient_profile")
+    appointments = db.relationship(
+        "Appointment",
+        back_populates="patient_profile",
+        cascade="all, delete-orphan",
+        order_by="Appointment.created_at.desc()",
+    )
 
     def __repr__(self):
         return f"<PatientProfile {self.patient_reference or self.id}>"
@@ -114,6 +120,12 @@ class StaffProfile(db.Model):
         back_populates="staff_profile",
         cascade="all, delete-orphan",
         order_by="AvailabilityBlock.available_date.asc()",
+    )
+    appointments = db.relationship(
+        "Appointment",
+        back_populates="staff_profile",
+        cascade="all, delete-orphan",
+        order_by="Appointment.created_at.desc()",
     )
 
     def __repr__(self):
@@ -181,6 +193,11 @@ class AppointmentSlot(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     availability_block = db.relationship("AvailabilityBlock", back_populates="slots")
+    appointments = db.relationship(
+        "Appointment",
+        back_populates="slot",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def staff_profile(self):
@@ -188,3 +205,25 @@ class AppointmentSlot(db.Model):
 
     def __repr__(self):
         return f"<AppointmentSlot {self.start_at} {self.status}>"
+
+
+class Appointment(db.Model):
+    """A patient appointment booked against a generated staff slot."""
+
+    __tablename__ = "appointments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_profile_id = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False, index=True)
+    staff_profile_id = db.Column(db.Integer, db.ForeignKey("staff_profiles.id"), nullable=False, index=True)
+    appointment_slot_id = db.Column(db.Integer, db.ForeignKey("appointment_slots.id"), nullable=False, index=True)
+    status = db.Column(db.String(30), default="Booked", nullable=False, index=True)
+    reason = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    patient_profile = db.relationship("PatientProfile", back_populates="appointments")
+    staff_profile = db.relationship("StaffProfile", back_populates="appointments")
+    slot = db.relationship("AppointmentSlot", back_populates="appointments")
+
+    def __repr__(self):
+        return f"<Appointment {self.id} {self.status}>"

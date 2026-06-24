@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import role_required
 from app.extensions import db
-from app.models import PatientProfile
+from app.models import Appointment, PatientProfile
 from app.patients import patients_bp
 from app.patients.forms import PatientProfileForm
 
@@ -23,7 +23,17 @@ def ensure_patient_profile(user):
 @role_required("Patient")
 def dashboard():
     profile = ensure_patient_profile(current_user)
-    return render_template("patients/dashboard.html", profile=profile)
+    upcoming_appointments = (
+        Appointment.query.filter_by(patient_profile_id=profile.id, status="Booked")
+        .order_by(Appointment.created_at.desc())
+        .limit(5)
+        .all()
+    )
+    return render_template(
+        "patients/dashboard.html",
+        profile=profile,
+        upcoming_appointments=upcoming_appointments,
+    )
 
 
 @patients_bp.route("/profile", methods=["GET", "POST"])

@@ -1,23 +1,19 @@
 # MediQueue
 
-MediQueue is a secure web-based GP appointment and prescription management system developed with Flask.
+MediQueue is a secure web-based GP appointment and prescription management system.
 
 ## Current functionality
 
-- Flask application factory structure
-- Environment-based configuration
-- SQLAlchemy database setup
-- User and role models
-- Patient profile model
-- Staff profile and professional registration models
-- Seeded demo users for patient, doctor, nurse and practice admin roles
-- Login, logout and patient registration
-- Role-based routing
-- Patient dashboard and profile management
-- Doctor and nurse staff dashboard
-- Practice admin dashboard overview
-- Staff availability management
+- Flask backend application structure
+- Local database configuration
+- Role-based accounts for Patient, Doctor, Nurse and Practice Admin
+- Patient registration, login and logout
+- Patient profile and dashboard
+- Doctor and nurse staff profiles
+- Staff availability creation
 - Automatic appointment slot generation
+- Patient appointment slot browsing and booking
+- Practice Admin dashboard overview
 
 ## Setup
 
@@ -37,17 +33,26 @@ http://127.0.0.1:5000
 
 ## Demo accounts
 
-| Role | Email | Password |
-|---|---|---|
-| Practice Admin | admin@mediqueue.health | AdminPass123! |
-| Doctor | doctor@mediqueue.health | DoctorPass123! |
-| Nurse | nurse@mediqueue.health | NursePass123! |
-| Patient | patient@mediqueue.health | PatientPass123! |
+```text
+Practice Admin: admin@mediqueue.health / AdminPass123!
+Doctor: doctor@mediqueue.health / DoctorPass123!
+Nurse: nurse@mediqueue.health / NursePass123!
+Patient: patient@mediqueue.health / PatientPass123!
+```
+
+## Appointment booking flow
+
+1. Log in as doctor or nurse.
+2. Open Staff Dashboard.
+3. Add availability from the availability page.
+4. Log out and log in as the patient.
+5. Open Book Appointment.
+6. Select and book an available slot.
 
 ## Useful commands
 
 ```bash
 flask --app run.py reset-db --yes
-flask --app run.py seed-data
 flask --app run.py check-logins
+python run.py
 ```
