@@ -5,6 +5,7 @@ from app.models import Appointment, AppointmentSlot
 
 
 ACTIVE_APPOINTMENT_STATUSES = {"Booked"}
+FINAL_APPOINTMENT_STATUSES = {"Cancelled", "Completed", "Missed"}
 
 
 def generate_slots_for_availability(availability_block):
@@ -33,7 +34,7 @@ def generate_slots_for_availability(availability_block):
 
 
 def slot_has_active_booking(slot_id):
-    """Return True when the slot already has a booked appointment."""
+    """Return True when the slot already has an active booked appointment."""
     return (
         Appointment.query.filter(Appointment.appointment_slot_id == slot_id)
         .filter(Appointment.status.in_(ACTIVE_APPOINTMENT_STATUSES))
@@ -84,5 +85,34 @@ def book_appointment(patient_profile, slot_id, reason=""):
     )
     slot.status = "Booked"
     db.session.add(appointment)
+    db.session.flush()
+    return appointment
+
+
+def cancel_appointment(appointment):
+    """Cancel a future booked appointment and release the slot for another patient."""
+    if appointment.status != "Booked":
+        raise ValueError("Only booked appointments can be cancelled.")
+
+    if appointment.slot.start_at <= datetime.now():
+        raise ValueError("Only future appointments can be cancelled.")
+
+    appointment.status = "Cancelled"
+    appointment.slot.status = "Available"
+    db.session.flush()
+    return appointment
+
+
+def update_appointment_status(appointment, status, internal_note=""):
+    """Update appointment outcome after staff review or consultation."""
+    allowed_statuses = {"Booked", "Completed", "Missed"}
+    if status not in allowed_statuses:
+        raise ValueError("Please choose a valid appointment status.")
+
+    if appointment.status == "Cancelled":
+        raise ValueError("Cancelled appointments cannot be updated.")
+
+    appointment.status = status
+    appointment.internal_note = internal_note or None
     db.session.flush()
     return appointment

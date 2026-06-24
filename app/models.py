@@ -218,6 +218,7 @@ class Appointment(db.Model):
     appointment_slot_id = db.Column(db.Integer, db.ForeignKey("appointment_slots.id"), nullable=False, index=True)
     status = db.Column(db.String(30), default="Booked", nullable=False, index=True)
     reason = db.Column(db.String(255))
+    internal_note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

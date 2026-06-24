@@ -1,12 +1,14 @@
+from datetime import date, datetime, time
+
 from flask import flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from app.decorators import role_required
 from app.extensions import db
-from app.models import AppointmentSlot, AvailabilityBlock, ProfessionalRegister, StaffProfile
-from app.services import generate_slots_for_availability
+from app.models import Appointment, AppointmentSlot, AvailabilityBlock, ProfessionalRegister, StaffProfile
+from app.services import generate_slots_for_availability, update_appointment_status
 from app.staff import staff_bp
-from app.staff.forms import AvailabilityForm, StaffProfileForm
+from app.staff.forms import AppointmentStatusForm, AvailabilityForm, StaffProfileForm
 
 
 def ensure_staff_profile(user):
@@ -39,6 +41,14 @@ def dashboard():
         .filter(AvailabilityBlock.staff_profile_id == profile.id, AppointmentSlot.status == "Available")
         .count()
     )
+    today_appointments = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(Appointment.staff_profile_id == profile.id)
+        .filter(AppointmentSlot.start_at >= datetime.combine(date.today(), time.min))
+        .order_by(AppointmentSlot.start_at.asc())
+        .limit(5)
+        .all()
+    )
     upcoming_blocks = (
         AvailabilityBlock.query.filter_by(staff_profile_id=profile.id)
         .order_by(AvailabilityBlock.available_date.asc(), AvailabilityBlock.start_time.asc())
@@ -50,6 +60,7 @@ def dashboard():
         profile=profile,
         availability_count=availability_count,
         available_slot_count=available_slot_count,
+        today_appointments=today_appointments,
         upcoming_blocks=upcoming_blocks,
     )
 
@@ -101,3 +112,46 @@ def availability():
         .all()
     )
     return render_template("staff/availability.html", form=form, blocks=blocks)
+
+
+@staff_bp.route("/schedule")
+@login_required
+@role_required("Doctor", "Nurse")
+def schedule():
+    profile = ensure_staff_profile(current_user)
+    appointments = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(Appointment.staff_profile_id == profile.id)
+        .order_by(AppointmentSlot.start_at.desc())
+        .all()
+    )
+    return render_template("staff/schedule.html", appointments=appointments)
+
+
+@staff_bp.route("/appointments/<int:appointment_id>/update", methods=["GET", "POST"])
+@login_required
+@role_required("Doctor", "Nurse")
+def update_appointment(appointment_id):
+    profile = ensure_staff_profile(current_user)
+    appointment = Appointment.query.get_or_404(appointment_id)
+
+    if appointment.staff_profile_id != profile.id:
+        flash("You can only update appointments assigned to you.", "danger")
+        return redirect(url_for("staff.schedule"))
+
+    form = AppointmentStatusForm(obj=appointment)
+    if form.validate_on_submit():
+        try:
+            update_appointment_status(
+                appointment,
+                status=form.status.data,
+                internal_note=form.internal_note.data,
+            )
+            db.session.commit()
+            flash("Appointment updated successfully.", "success")
+            return redirect(url_for("staff.schedule"))
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), "danger")
+
+    return render_template("staff/update_appointment.html", form=form, appointment=appointment)

@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import DateField, IntegerField, StringField, SubmitField, TimeField
+from wtforms import DateField, IntegerField, SelectField, StringField, SubmitField, TextAreaField, TimeField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 
 
@@ -25,3 +25,17 @@ class AvailabilityForm(FlaskForm):
     def validate_end_time(self, field):
         if self.start_time.data and field.data and field.data <= self.start_time.data:
             raise ValidationError("End time must be later than start time.")
+
+
+class AppointmentStatusForm(FlaskForm):
+    status = SelectField(
+        "Appointment status",
+        choices=[
+            ("Booked", "Booked"),
+            ("Completed", "Completed"),
+            ("Missed", "Missed"),
+        ],
+        validators=[DataRequired()],
+    )
+    internal_note = TextAreaField("Internal note", validators=[Optional(), Length(max=500)])
+    submit = SubmitField("Update Appointment")

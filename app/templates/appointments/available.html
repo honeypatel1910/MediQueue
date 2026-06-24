@@ -9,7 +9,10 @@
         <h1 class="h3 fw-bold mb-1">Available GP and nurse appointments</h1>
         <p class="text-muted mb-0">Choose a suitable appointment slot from the available practice schedule.</p>
     </div>
-    <a class="btn btn-outline-primary" href="{{ url_for('patients.dashboard') }}">Back to Dashboard</a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary" href="{{ url_for('patients.appointments') }}">My Appointments</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('patients.dashboard') }}">Back to Dashboard</a>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
