@@ -1,0 +1,56 @@
+<div class="table-responsive">
+    <table class="table align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Medicine</th>
+                <th>Quantity</th>
+                <th>Patient</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th>Created</th>
+                <th class="text-end">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in prescriptions %}
+                <tr>
+                    <td class="fw-semibold">{{ item.medicine_name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.patient_profile.user.full_name }}</td>
+                    <td>
+                        {% if item.status == 'Approved' %}
+                            <span class="badge text-bg-success">Approved</span>
+                        {% elif item.status == 'Rejected' %}
+                            <span class="badge text-bg-danger">Rejected</span>
+                        {% elif item.status == 'Under Review' %}
+                            <span class="badge text-bg-warning">Under Review</span>
+                        {% else %}
+                            <span class="badge text-bg-primary">Requested</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.payment_status == 'Pending' %}
+                            <span class="badge text-bg-warning">Due £{{ '%.2f'|format(item.amount_due or 0) }}</span>
+                        {% elif item.payment_status == 'Paid' %}
+                            <span class="badge text-bg-success">Paid</span>
+                        {% else %}
+                            <span class="text-muted small">Not required</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.created_at.strftime('%d %b %Y') }}</td>
+                    <td class="text-end">
+                        {% if current_user.has_role('Doctor') %}
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('prescriptions.review', prescription_id=item.id) }}">Review</a>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="7" class="text-muted py-4 text-center">No prescriptions found.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -12,12 +12,15 @@
     <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-primary" href="{{ url_for('staff.availability') }}">Manage Availability</a>
         <a class="btn btn-outline-primary" href="{{ url_for('staff.schedule') }}">Open Schedule</a>
+        {% if current_user.has_role('Doctor') %}
+            <a class="btn btn-outline-primary" href="{{ url_for('prescriptions.manage') }}">Review Prescriptions</a>
+        {% endif %}
         <a class="btn btn-outline-secondary" href="{{ url_for('staff.profile') }}">Edit Staff Profile</a>
     </div>
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body p-4">
                 <p class="text-muted mb-1">Availability Blocks</p>
@@ -25,7 +28,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body p-4">
                 <p class="text-muted mb-1">Available Slots</p>
@@ -33,7 +36,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body p-4">
                 <p class="text-muted mb-1">Appointments Shown</p>
@@ -41,6 +44,16 @@
             </div>
         </div>
     </div>
+{% if current_user.has_role('Doctor') %}
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <p class="text-muted mb-1">Prescription Requests</p>
+                <h2 class="h3 fw-bold mb-0">{{ pending_prescription_count }}</h2>
+            </div>
+        </div>
+    </div>
+{% endif %}
 </div>
 
 <div class="row g-4">

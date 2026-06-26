@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import role_required
 from app.extensions import db
-from app.models import Appointment, AppointmentSlot, AvailabilityBlock, ProfessionalRegister, StaffProfile
+from app.models import Appointment, AppointmentSlot, AvailabilityBlock, Prescription, ProfessionalRegister, StaffProfile
 from app.services import generate_slots_for_availability, update_appointment_status
 from app.staff import staff_bp
 from app.staff.forms import AppointmentStatusForm, AvailabilityForm, StaffProfileForm
@@ -49,6 +49,11 @@ def dashboard():
         .limit(5)
         .all()
     )
+    pending_prescription_count = 0
+    if current_user.has_role("Doctor"):
+        pending_prescription_count = Prescription.query.filter(
+            Prescription.status.in_(["Requested", "Under Review"])
+        ).count()
     upcoming_blocks = (
         AvailabilityBlock.query.filter_by(staff_profile_id=profile.id)
         .order_by(AvailabilityBlock.available_date.asc(), AvailabilityBlock.start_time.asc())
@@ -61,6 +66,7 @@ def dashboard():
         availability_count=availability_count,
         available_slot_count=available_slot_count,
         today_appointments=today_appointments,
+        pending_prescription_count=pending_prescription_count,
         upcoming_blocks=upcoming_blocks,
     )
 

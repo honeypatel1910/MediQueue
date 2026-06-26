@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import role_required
 from app.extensions import db
-from app.models import Appointment, AppointmentSlot, PatientProfile
+from app.models import Appointment, AppointmentSlot, PatientProfile, Prescription
 from app.patients import patients_bp
 from app.patients.forms import PatientProfileForm
 
@@ -37,10 +37,17 @@ def dashboard():
         .limit(5)
         .all()
     )
+    recent_prescriptions = (
+        Prescription.query.filter_by(patient_profile_id=profile.id)
+        .order_by(Prescription.created_at.desc())
+        .limit(5)
+        .all()
+    )
     return render_template(
         "patients/dashboard.html",
         profile=profile,
         upcoming_appointments=upcoming_appointments,
+        recent_prescriptions=recent_prescriptions,
     )
 
 

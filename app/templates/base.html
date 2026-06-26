@@ -23,10 +23,14 @@
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('patients.profile') }}">Profile</a></li>
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('appointments.available_slots') }}">Book Appointment</a></li>
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('patients.appointments') }}">Appointments</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('prescriptions.history') }}">Prescriptions</a></li>
                         {% elif current_user.has_role('Doctor', 'Nurse') %}
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.dashboard') }}">Staff Dashboard</a></li>
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.availability') }}">Availability</a></li>
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.schedule') }}">Schedule</a></li>
+                            {% if current_user.has_role('Doctor') %}
+                                <li class="nav-item"><a class="nav-link" href="{{ url_for('prescriptions.manage') }}">Prescriptions</a></li>
+                            {% endif %}
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('staff.profile') }}">Staff Profile</a></li>
                         {% elif current_user.has_role('Practice Admin') %}
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a></li>

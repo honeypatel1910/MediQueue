@@ -91,6 +91,12 @@ class PatientProfile(db.Model):
         cascade="all, delete-orphan",
         order_by="Appointment.created_at.desc()",
     )
+    prescriptions = db.relationship(
+        "Prescription",
+        back_populates="patient_profile",
+        cascade="all, delete-orphan",
+        order_by="Prescription.created_at.desc()",
+    )
 
     def __repr__(self):
         return f"<PatientProfile {self.patient_reference or self.id}>"
@@ -126,6 +132,11 @@ class StaffProfile(db.Model):
         back_populates="staff_profile",
         cascade="all, delete-orphan",
         order_by="Appointment.created_at.desc()",
+    )
+    reviewed_prescriptions = db.relationship(
+        "Prescription",
+        back_populates="reviewed_by_staff",
+        foreign_keys="Prescription.reviewed_by_staff_profile_id",
     )
 
     def __repr__(self):
@@ -228,3 +239,42 @@ class Appointment(db.Model):
 
     def __repr__(self):
         return f"<Appointment {self.id} {self.status}>"
+
+class Prescription(db.Model):
+    """A patient prescription request reviewed by clinical staff."""
+
+    __tablename__ = "prescriptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_profile_id = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False, index=True)
+    reviewed_by_staff_profile_id = db.Column(db.Integer, db.ForeignKey("staff_profiles.id"), nullable=True)
+    medicine_name = db.Column(db.String(120), nullable=False)
+    quantity = db.Column(db.String(80), nullable=False)
+    reason = db.Column(db.String(255))
+    status = db.Column(db.String(50), default="Requested", nullable=False, index=True)
+    payment_status = db.Column(db.String(30), default="Not Required", nullable=False, index=True)
+    amount_due = db.Column(db.Float, default=0.0, nullable=False)
+    payment_method = db.Column(db.String(40))
+    payment_reference = db.Column(db.String(80), unique=True, index=True)
+    paid_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_at = db.Column(db.DateTime)
+
+    patient_profile = db.relationship("PatientProfile", back_populates="prescriptions")
+    reviewed_by_staff = db.relationship(
+        "StaffProfile",
+        back_populates="reviewed_prescriptions",
+        foreign_keys=[reviewed_by_staff_profile_id],
+    )
+
+    @property
+    def payment_label(self):
+        if self.payment_status == "Paid":
+            return "Paid"
+        if self.payment_status == "Pending":
+            return "Payment Pending"
+        return "Not Required"
+
+    def __repr__(self):
+        return f"<Prescription {self.id} {self.status}>"
+

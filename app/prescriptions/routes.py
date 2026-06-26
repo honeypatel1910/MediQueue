@@ -1,0 +1,99 @@
+from datetime import datetime
+
+from flask import flash, redirect, render_template, url_for
+from flask_login import current_user, login_required
+
+from app.decorators import role_required
+from app.extensions import db
+from app.models import PatientProfile, Prescription
+from app.prescriptions import prescriptions_bp
+from app.prescriptions.forms import PrescriptionRequestForm, PrescriptionReviewForm
+
+
+PRESCRIPTION_STANDARD_FEE = 9.90
+
+
+def ensure_patient_profile(user):
+    """Create a patient profile for patient accounts that do not have one yet."""
+    if user.patient_profile is None:
+        user.patient_profile = PatientProfile(patient_reference=f"MQP-{user.id:05d}")
+        db.session.commit()
+    return user.patient_profile
+
+
+@prescriptions_bp.route("/request", methods=["GET", "POST"])
+@login_required
+@role_required("Patient")
+def request_prescription():
+    profile = ensure_patient_profile(current_user)
+    form = PrescriptionRequestForm()
+
+    if form.validate_on_submit():
+        prescription = Prescription(
+            patient_profile_id=profile.id,
+            medicine_name=form.medicine_name.data,
+            quantity=form.quantity.data,
+            reason=form.reason.data,
+            status="Requested",
+            payment_status="Not Required",
+            amount_due=0.0,
+        )
+        db.session.add(prescription)
+        db.session.commit()
+        flash("Prescription request submitted successfully.", "success")
+        return redirect(url_for("prescriptions.history"))
+
+    return render_template("prescriptions/request.html", form=form)
+
+
+@prescriptions_bp.route("/history")
+@login_required
+@role_required("Patient")
+def history():
+    profile = ensure_patient_profile(current_user)
+    prescriptions = (
+        Prescription.query.filter_by(patient_profile_id=profile.id)
+        .order_by(Prescription.created_at.desc())
+        .all()
+    )
+    return render_template("prescriptions/history.html", prescriptions=prescriptions)
+
+
+@prescriptions_bp.route("/manage")
+@login_required
+@role_required("Doctor")
+def manage():
+    prescriptions = Prescription.query.order_by(Prescription.created_at.desc()).all()
+    return render_template("prescriptions/manage.html", prescriptions=prescriptions)
+
+
+@prescriptions_bp.route("/<int:prescription_id>/review", methods=["GET", "POST"])
+@login_required
+@role_required("Doctor")
+def review(prescription_id):
+    prescription = Prescription.query.get_or_404(prescription_id)
+    form = PrescriptionReviewForm(obj=prescription)
+
+    if form.validate_on_submit():
+        new_status = form.status.data
+        prescription.status = new_status
+        prescription.reviewed_at = datetime.utcnow()
+
+        if current_user.staff_profile:
+            prescription.reviewed_by_staff_profile_id = current_user.staff_profile.id
+
+        if new_status == "Approved":
+            prescription.payment_status = "Pending"
+            prescription.amount_due = PRESCRIPTION_STANDARD_FEE
+        elif new_status == "Rejected":
+            prescription.payment_status = "Not Required"
+            prescription.amount_due = 0.0
+        elif new_status in {"Requested", "Under Review"}:
+            prescription.payment_status = "Not Required"
+            prescription.amount_due = 0.0
+
+        db.session.commit()
+        flash("Prescription status updated successfully.", "success")
+        return redirect(url_for("prescriptions.manage"))
+
+    return render_template("prescriptions/review.html", form=form, prescription=prescription)

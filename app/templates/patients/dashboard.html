@@ -10,7 +10,7 @@
                 <p class="text-uppercase text-primary fw-semibold small mb-2">Patient Dashboard</p>
                 <h1 class="h3 fw-bold mb-3">Welcome, {{ current_user.first_name }}</h1>
                 <p class="text-muted mb-4">
-                    Manage your MediQueue patient account, book GP appointments and keep your details up to date.
+                    Manage your MediQueue patient account, book GP appointments and track prescription requests.
                 </p>
 
                 <div class="row g-3 mb-4">
@@ -28,8 +28,8 @@
                     </div>
                     <div class="col-md-4">
                         <div class="border rounded-3 p-3 h-100 bg-light">
-                            <div class="fw-semibold">Appointments</div>
-                            <div class="small text-muted">Review appointment status and cancel future bookings when needed.</div>
+                            <div class="fw-semibold">Prescriptions</div>
+                            <div class="small text-muted">Submit and track prescription requests from your patient account.</div>
                         </div>
                     </div>
                 </div>
@@ -37,6 +37,7 @@
                 <div class="d-flex gap-2 flex-wrap">
                     <a class="btn btn-primary" href="{{ url_for('appointments.available_slots') }}">Book Appointment</a>
                     <a class="btn btn-outline-primary" href="{{ url_for('patients.appointments') }}">View Appointments</a>
+                    <a class="btn btn-outline-primary" href="{{ url_for('prescriptions.request_prescription') }}">Request Prescription</a>
                     <a class="btn btn-outline-secondary" href="{{ url_for('patients.profile') }}">Update Profile</a>
                 </div>
             </div>
@@ -71,6 +72,17 @@
         </div>
         {% set appointments = upcoming_appointments %}
         {% include "partials/appointments_table.html" %}
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mt-4">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h2 class="h5 fw-bold mb-0">Recent prescriptions</h2>
+            <a class="btn btn-sm btn-primary" href="{{ url_for('prescriptions.request_prescription') }}">Request Prescription</a>
+        </div>
+        {% set prescriptions = recent_prescriptions %}
+        {% include "partials/prescriptions_table.html" %}
     </div>
 </div>
 {% endblock %}
