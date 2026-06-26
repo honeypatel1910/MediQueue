@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Prescription Payment | MediQueue{% endblock %}
+
+{% block content %}
+<div class="row g-4 justify-content-center">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-4">
+                <p class="text-uppercase text-primary fw-semibold small mb-2">Prescription Payment</p>
+                <h1 class="h4 fw-bold mb-4">Payment summary</h1>
+                <dl class="mb-0">
+                    <dt>Medicine</dt>
+                    <dd>{{ prescription.medicine_name }}</dd>
+                    <dt>Quantity</dt>
+                    <dd>{{ prescription.quantity }}</dd>
+                    <dt>Status</dt>
+                    <dd>{{ prescription.status }}</dd>
+                    <dt>Amount Due</dt>
+                    <dd class="fw-bold">£{{ '%.2f'|format(prescription.amount_due or 0) }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <form method="post" class="card border-0 shadow-sm" novalidate>
+            <div class="card-body p-4">
+                {{ form.hidden_tag() }}
+                <h2 class="h5 fw-bold mb-3">Complete payment</h2>
+                <div class="mb-3">
+                    {{ form.payment_method.label(class="form-label") }}
+                    {{ form.payment_method(class="form-select") }}
+                    {% for error in form.payment_method.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="mb-4">
+                    {{ form.cardholder_name.label(class="form-label") }}
+                    {{ form.cardholder_name(class="form-control") }}
+                    {% for error in form.cardholder_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a class="btn btn-outline-secondary" href="{{ url_for('prescriptions.history') }}">Back to Prescriptions</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

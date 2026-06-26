@@ -41,6 +41,10 @@
                     <td class="text-end">
                         {% if current_user.has_role('Doctor') %}
                             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('prescriptions.review', prescription_id=item.id) }}">Review</a>
+                        {% elif current_user.has_role('Patient') and item.status == 'Approved' and item.payment_status == 'Pending' %}
+                            <a class="btn btn-sm btn-primary" href="{{ url_for('prescriptions.pay_prescription', prescription_id=item.id) }}">Pay</a>
+                        {% elif current_user.has_role('Patient') and item.payment_status == 'Paid' and item.payment_reference %}
+                            <span class="text-muted small">{{ item.payment_reference }}</span>
                         {% else %}
                             <span class="text-muted small">—</span>
                         {% endif %}

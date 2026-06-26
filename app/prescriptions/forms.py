@@ -32,3 +32,17 @@ class PrescriptionReviewForm(FlaskForm):
         validators=[DataRequired()],
     )
     submit = SubmitField("Update Prescription")
+
+
+class PrescriptionPaymentForm(FlaskForm):
+    payment_method = SelectField(
+        "Payment method",
+        choices=[
+            ("Debit Card", "Debit Card"),
+            ("Credit Card", "Credit Card"),
+            ("Online Payment", "Online Payment"),
+        ],
+        validators=[DataRequired()],
+    )
+    cardholder_name = StringField("Cardholder name", validators=[DataRequired(), Length(max=120)])
+    submit = SubmitField("Pay Prescription Charge")

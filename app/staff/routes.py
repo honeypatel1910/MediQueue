@@ -120,6 +120,43 @@ def availability():
     return render_template("staff/availability.html", form=form, blocks=blocks)
 
 
+@staff_bp.route("/availability/<int:block_id>/edit", methods=["GET", "POST"])
+@login_required
+@role_required("Doctor", "Nurse")
+def edit_availability(block_id):
+    profile = ensure_staff_profile(current_user)
+    block = AvailabilityBlock.query.get_or_404(block_id)
+
+    if block.staff_profile_id != profile.id:
+        flash("You can only update your own availability.", "danger")
+        return redirect(url_for("staff.availability"))
+
+    linked_appointments = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(AppointmentSlot.availability_block_id == block.id)
+        .count()
+    )
+    if linked_appointments:
+        flash("Availability linked to appointments cannot be changed. Create a new availability block instead.", "warning")
+        return redirect(url_for("staff.availability"))
+
+    form = AvailabilityForm(obj=block)
+    form.submit.label.text = "Update Availability"
+
+    if form.validate_on_submit():
+        block.available_date = form.available_date.data
+        block.start_time = form.start_time.data
+        block.end_time = form.end_time.data
+        block.slot_duration_minutes = form.slot_duration_minutes.data
+        block.location = form.location.data or "GP Practice"
+        slots = generate_slots_for_availability(block)
+        db.session.commit()
+        flash(f"Availability updated with {len(slots)} appointment slots.", "success")
+        return redirect(url_for("staff.availability"))
+
+    return render_template("staff/edit_availability.html", form=form, block=block)
+
+
 @staff_bp.route("/schedule")
 @login_required
 @role_required("Doctor", "Nurse")

@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 
 from flask import flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
@@ -7,7 +8,7 @@ from app.decorators import role_required
 from app.extensions import db
 from app.models import PatientProfile, Prescription
 from app.prescriptions import prescriptions_bp
-from app.prescriptions.forms import PrescriptionRequestForm, PrescriptionReviewForm
+from app.prescriptions.forms import PrescriptionPaymentForm, PrescriptionRequestForm, PrescriptionReviewForm
 
 
 PRESCRIPTION_STANDARD_FEE = 9.90
@@ -97,3 +98,39 @@ def review(prescription_id):
         return redirect(url_for("prescriptions.manage"))
 
     return render_template("prescriptions/review.html", form=form, prescription=prescription)
+
+
+@prescriptions_bp.route("/<int:prescription_id>/pay", methods=["GET", "POST"])
+@login_required
+@role_required("Patient")
+def pay_prescription(prescription_id):
+    profile = ensure_patient_profile(current_user)
+    prescription = Prescription.query.get_or_404(prescription_id)
+
+    if prescription.patient_profile_id != profile.id:
+        flash("You can only pay for your own prescription requests.", "danger")
+        return redirect(url_for("prescriptions.history"))
+
+    if prescription.status != "Approved":
+        flash("Only approved prescriptions can be paid.", "warning")
+        return redirect(url_for("prescriptions.history"))
+
+    if prescription.payment_status == "Paid":
+        flash("This prescription has already been paid.", "info")
+        return redirect(url_for("prescriptions.history"))
+
+    if prescription.payment_status != "Pending" or not prescription.amount_due:
+        flash("There is no payment due for this prescription.", "info")
+        return redirect(url_for("prescriptions.history"))
+
+    form = PrescriptionPaymentForm()
+    if form.validate_on_submit():
+        prescription.payment_status = "Paid"
+        prescription.payment_method = form.payment_method.data
+        prescription.payment_reference = f"MQPAY-{uuid4().hex[:10].upper()}"
+        prescription.paid_at = datetime.utcnow()
+        db.session.commit()
+        flash("Prescription payment completed successfully.", "success")
+        return redirect(url_for("prescriptions.history"))
+
+    return render_template("prescriptions/pay.html", form=form, prescription=prescription)

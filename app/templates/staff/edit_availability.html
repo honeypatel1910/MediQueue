@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Availability | MediQueue{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-primary fw-semibold small mb-2">Availability</p>
+        <h1 class="h3 fw-bold mb-1">Edit appointment availability</h1>
+        <p class="text-muted mb-0">Update the working time or slot duration and MediQueue will regenerate appointment slots.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('staff.availability') }}">Back to Availability</a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Availability Details</h2>
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.available_date.label(class="form-label") }}
+                        {{ form.available_date(class="form-control") }}
+                        {% for error in form.available_date.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            {{ form.start_time.label(class="form-label") }}
+                            {{ form.start_time(class="form-control") }}
+                            {% for error in form.start_time.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.end_time.label(class="form-label") }}
+                            {{ form.end_time(class="form-control") }}
+                            {% for error in form.end_time.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        {{ form.slot_duration_minutes.label(class="form-label") }}
+                        {{ form.slot_duration_minutes(class="form-control") }}
+                        {% for error in form.slot_duration_minutes.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="mb-4">
+                        {{ form.location.label(class="form-label") }}
+                        {{ form.location(class="form-control") }}
+                        {% for error in form.location.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a class="btn btn-outline-secondary" href="{{ url_for('staff.availability') }}">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
