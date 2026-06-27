@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import PatientProfile, Prescription
 from app.prescriptions import prescriptions_bp
 from app.prescriptions.forms import PrescriptionPaymentForm, PrescriptionRequestForm, PrescriptionReviewForm
+from app.services import notify_user
 
 
 PRESCRIPTION_STANDARD_FEE = 9.90
@@ -93,6 +94,11 @@ def review(prescription_id):
             prescription.payment_status = "Not Required"
             prescription.amount_due = 0.0
 
+        notify_user(
+            prescription.patient_profile.user_id,
+            "Prescription updated",
+            f"Your prescription request for {prescription.medicine_name} is now: {prescription.status}.",
+        )
         db.session.commit()
         flash("Prescription status updated successfully.", "success")
         return redirect(url_for("prescriptions.manage"))
@@ -129,6 +135,11 @@ def pay_prescription(prescription_id):
         prescription.payment_method = form.payment_method.data
         prescription.payment_reference = f"MQPAY-{uuid4().hex[:10].upper()}"
         prescription.paid_at = datetime.utcnow()
+        notify_user(
+            prescription.patient_profile.user_id,
+            "Prescription payment received",
+            f"Payment has been received for {prescription.medicine_name}. Reference: {prescription.payment_reference}.",
+        )
         db.session.commit()
         flash("Prescription payment completed successfully.", "success")
         return redirect(url_for("prescriptions.history"))

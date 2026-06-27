@@ -1,11 +1,18 @@
 from datetime import datetime, timedelta
 
 from app.extensions import db
-from app.models import Appointment, AppointmentSlot
+from app.models import Appointment, AppointmentSlot, Notification
 
 
 ACTIVE_APPOINTMENT_STATUSES = {"Booked"}
 FINAL_APPOINTMENT_STATUSES = {"Cancelled", "Completed", "Missed"}
+
+
+def notify_user(user_id, title, message):
+    """Create an in-app notification for one user."""
+    notification = Notification(user_id=user_id, title=title, message=message)
+    db.session.add(notification)
+    return notification
 
 
 def generate_slots_for_availability(availability_block):
@@ -85,6 +92,16 @@ def book_appointment(patient_profile, slot_id, reason=""):
     )
     slot.status = "Booked"
     db.session.add(appointment)
+    notify_user(
+        patient_profile.user_id,
+        "Appointment booked",
+        f"Your appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')} has been booked.",
+    )
+    notify_user(
+        slot.staff_profile.user_id,
+        "New appointment booked",
+        f"A patient booked an appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')}.",
+    )
     db.session.flush()
     return appointment
 
@@ -99,6 +116,16 @@ def cancel_appointment(appointment):
 
     appointment.status = "Cancelled"
     appointment.slot.status = "Available"
+    notify_user(
+        appointment.patient_profile.user_id,
+        "Appointment cancelled",
+        f"Your appointment on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was cancelled.",
+    )
+    notify_user(
+        appointment.staff_profile.user_id,
+        "Appointment cancelled",
+        f"Appointment on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was cancelled.",
+    )
     db.session.flush()
     return appointment
 

@@ -35,6 +35,7 @@ def create_app(config_class=Config):
     from app.admin import admin_bp
     from app.appointments import appointments_bp
     from app.prescriptions import prescriptions_bp
+    from app.notifications import notifications_bp
 
     register_commands(app)
     app.register_blueprint(auth_bp)
@@ -43,6 +44,7 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp)
     app.register_blueprint(appointments_bp)
     app.register_blueprint(prescriptions_bp)
+    app.register_blueprint(notifications_bp)
 
     @app.route("/")
     def index():

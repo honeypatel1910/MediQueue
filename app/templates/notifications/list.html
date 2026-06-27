@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Notifications - MediQueue{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <p class="text-uppercase small text-primary fw-semibold mb-1">Notifications</p>
+        <h1 class="h3 mb-1">Notifications</h1>
+        <p class="text-muted mb-0">Appointment and prescription updates for your account.</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="d-grid gap-3">
+            {% for notification in notifications %}
+                <div class="card border-0 shadow-sm {% if not notification.is_read %}border-start border-4 border-primary{% endif %}">
+                    <div class="card-body d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <h2 class="h6 mb-2">{{ notification.title }}</h2>
+                            <p class="text-muted mb-2">{{ notification.message }}</p>
+                            <small class="text-muted">{{ notification.created_at.strftime('%d %b %Y %H:%M') }}</small>
+                        </div>
+                        {% if not notification.is_read %}
+                            <form method="post" action="{{ url_for('notifications.mark_read', notification_id=notification.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-outline-primary btn-sm">Mark read</button>
+                            </form>
+                        {% else %}
+                            <span class="badge text-bg-light">Read</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <h2 class="h6 mb-1">No notifications</h2>
+                        <p class="text-muted mb-0">New appointment and prescription updates will appear here.</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -48,6 +48,12 @@ class User(UserMixin, db.Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    notifications = db.relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="Notification.created_at.desc()",
+    )
 
     @property
     def is_active(self):
@@ -277,4 +283,21 @@ class Prescription(db.Model):
 
     def __repr__(self):
         return f"<Prescription {self.id} {self.status}>"
+
+class Notification(db.Model):
+    """In-app notification shown to a specific MediQueue user."""
+
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    title = db.Column(db.String(120), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", back_populates="notifications")
+
+    def __repr__(self):
+        return f"<Notification {self.id} {self.title}>"
 
