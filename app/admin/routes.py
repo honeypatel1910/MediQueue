@@ -3,7 +3,7 @@ from flask_login import login_required
 
 from app.admin import admin_bp
 from app.decorators import role_required
-from app.models import PatientProfile, Role, StaffProfile, User
+from app.models import AuditLog, PatientProfile, Role, StaffProfile, User
 
 
 @admin_bp.route("/dashboard")
@@ -16,6 +16,7 @@ def dashboard():
     active_users = User.query.filter_by(active=True).count()
     roles = Role.query.order_by(Role.name.asc()).all()
     recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    recent_logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(8).all()
 
     return render_template(
         "admin/dashboard.html",
@@ -25,4 +26,13 @@ def dashboard():
         active_users=active_users,
         roles=roles,
         recent_users=recent_users,
+        recent_logs=recent_logs,
     )
+
+
+@admin_bp.route("/audit-logs")
+@login_required
+@role_required("Practice Admin")
+def audit_logs():
+    logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(300).all()
+    return render_template("admin/audit_logs.html", logs=logs)

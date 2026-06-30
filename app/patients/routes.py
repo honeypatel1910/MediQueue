@@ -6,6 +6,7 @@ from app.extensions import db
 from app.models import Appointment, AppointmentSlot, PatientProfile, Prescription
 from app.patients import patients_bp
 from app.patients.forms import PatientProfileForm
+from app.services import log_action
 
 
 def ensure_patient_profile(user):
@@ -62,6 +63,7 @@ def profile():
         profile.phone = form.phone.data
         profile.date_of_birth = form.date_of_birth.data
         profile.address = form.address.data
+        log_action("Patient profile updated", "PatientProfile", profile.id, "Patient contact details changed")
         db.session.commit()
         flash("Profile updated successfully.", "success")
         return redirect(url_for("patients.profile"))

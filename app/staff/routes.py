@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from app.decorators import role_required
 from app.extensions import db
 from app.models import Appointment, AppointmentSlot, AvailabilityBlock, Prescription, ProfessionalRegister, StaffProfile
-from app.services import generate_slots_for_availability, update_appointment_status
+from app.services import generate_slots_for_availability, log_action, update_appointment_status
 from app.staff import staff_bp
 from app.staff.forms import AppointmentStatusForm, AvailabilityForm, StaffProfileForm
 
@@ -82,6 +82,7 @@ def profile():
         profile.job_title = form.job_title.data or profile.job_title
         profile.department = form.department.data
         profile.phone_extension = form.phone_extension.data
+        log_action("Staff profile updated", "StaffProfile", profile.id, "Staff profile details changed")
         db.session.commit()
         flash("Staff profile updated successfully.", "success")
         return redirect(url_for("staff.profile"))
@@ -108,6 +109,12 @@ def availability():
         db.session.add(block)
         db.session.flush()
         slots = generate_slots_for_availability(block)
+        log_action(
+            "Availability created",
+            "AvailabilityBlock",
+            block.id,
+            f"{len(slots)} slots on {block.available_date}",
+        )
         db.session.commit()
         flash(f"Availability created with {len(slots)} appointment slots.", "success")
         return redirect(url_for("staff.availability"))
@@ -150,6 +157,12 @@ def edit_availability(block_id):
         block.slot_duration_minutes = form.slot_duration_minutes.data
         block.location = form.location.data or "GP Practice"
         slots = generate_slots_for_availability(block)
+        log_action(
+            "Availability updated",
+            "AvailabilityBlock",
+            block.id,
+            f"{len(slots)} slots on {block.available_date}",
+        )
         db.session.commit()
         flash(f"Availability updated with {len(slots)} appointment slots.", "success")
         return redirect(url_for("staff.availability"))

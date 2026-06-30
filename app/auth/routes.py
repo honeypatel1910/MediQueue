@@ -4,6 +4,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from app.auth.forms import LoginForm, RegistrationForm
 from app.extensions import db
 from app.models import PatientProfile, Role, User
+from app.services import log_action
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -40,6 +41,8 @@ def login():
 
         if user and user.is_active and user.check_password(form.password.data):
             login_user(user, remember=form.remember.data)
+            log_action("User login", "User", user.id, "Successful login")
+            db.session.commit()
             flash("You are now logged in.", "success")
             next_page = request.args.get("next")
             if next_page:
@@ -70,6 +73,7 @@ def register():
         db.session.add(user)
         db.session.flush()
         user.patient_profile = PatientProfile(patient_reference=f"MQP-{user.id:05d}")
+        log_action("Patient registration", "User", user.id, "New patient account created", user_id=user.id)
         db.session.commit()
 
         flash("Patient account created. You can now log in.", "success")
@@ -81,6 +85,8 @@ def register():
 @bp.route("/logout")
 @login_required
 def logout():
+    log_action("User logout", "User", current_user.id, "User logged out")
+    db.session.commit()
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for("index"))

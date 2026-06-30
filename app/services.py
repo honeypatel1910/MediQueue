@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta
 
+from flask import request
+from flask_login import current_user
+
 from app.extensions import db
-from app.models import Appointment, AppointmentSlot, Notification
+from app.models import Appointment, AppointmentSlot, AuditLog, Notification
 
 
 ACTIVE_APPOINTMENT_STATUSES = {"Booked"}
@@ -13,6 +16,32 @@ def notify_user(user_id, title, message):
     notification = Notification(user_id=user_id, title=title, message=message)
     db.session.add(notification)
     return notification
+
+
+def log_action(action, entity_type=None, entity_id=None, details=None, user_id=None):
+    """Record an auditable action without committing the transaction."""
+    if user_id is None:
+        try:
+            if current_user and current_user.is_authenticated:
+                user_id = current_user.id
+        except RuntimeError:
+            user_id = None
+
+    try:
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr)
+    except RuntimeError:
+        ip_address = None
+
+    log = AuditLog(
+        user_id=user_id,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        details=details,
+        ip_address=ip_address,
+    )
+    db.session.add(log)
+    return log
 
 
 def generate_slots_for_availability(availability_block):
@@ -103,6 +132,13 @@ def book_appointment(patient_profile, slot_id, reason=""):
         f"A patient booked an appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')}.",
     )
     db.session.flush()
+    log_action(
+        "Appointment booked",
+        "Appointment",
+        appointment.id,
+        f"Slot {slot.start_at.strftime('%Y-%m-%d %H:%M')} with {slot.staff_profile.user.full_name}",
+    )
+    db.session.flush()
     return appointment
 
 
@@ -126,6 +162,12 @@ def cancel_appointment(appointment):
         "Appointment cancelled",
         f"Appointment on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was cancelled.",
     )
+    log_action(
+        "Appointment cancelled",
+        "Appointment",
+        appointment.id,
+        f"Appointment on {appointment.slot.start_at.strftime('%Y-%m-%d %H:%M')}",
+    )
     db.session.flush()
     return appointment
 
@@ -139,7 +181,14 @@ def update_appointment_status(appointment, status, internal_note=""):
     if appointment.status == "Cancelled":
         raise ValueError("Cancelled appointments cannot be updated.")
 
+    previous_status = appointment.status
     appointment.status = status
     appointment.internal_note = internal_note or None
+    log_action(
+        "Appointment status updated",
+        "Appointment",
+        appointment.id,
+        f"{previous_status} to {status}",
+    )
     db.session.flush()
     return appointment

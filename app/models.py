@@ -54,6 +54,11 @@ class User(UserMixin, db.Model):
         cascade="all, delete-orphan",
         order_by="Notification.created_at.desc()",
     )
+    audit_logs = db.relationship(
+        "AuditLog",
+        back_populates="user",
+        order_by="AuditLog.created_at.desc()",
+    )
 
     @property
     def is_active(self):
@@ -301,3 +306,23 @@ class Notification(db.Model):
     def __repr__(self):
         return f"<Notification {self.id} {self.title}>"
 
+
+
+class AuditLog(db.Model):
+    """Security and activity record for important MediQueue actions."""
+
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    action = db.Column(db.String(120), nullable=False)
+    entity_type = db.Column(db.String(80))
+    entity_id = db.Column(db.Integer)
+    details = db.Column(db.String(500))
+    ip_address = db.Column(db.String(80))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", back_populates="audit_logs")
+
+    def __repr__(self):
+        return f"<AuditLog {self.action} {self.entity_type} {self.entity_id}>"

@@ -9,7 +9,7 @@ from app.extensions import db
 from app.models import PatientProfile, Prescription
 from app.prescriptions import prescriptions_bp
 from app.prescriptions.forms import PrescriptionPaymentForm, PrescriptionRequestForm, PrescriptionReviewForm
-from app.services import notify_user
+from app.services import log_action, notify_user
 
 
 PRESCRIPTION_STANDARD_FEE = 9.90
@@ -41,6 +41,13 @@ def request_prescription():
             amount_due=0.0,
         )
         db.session.add(prescription)
+        db.session.flush()
+        log_action(
+            "Prescription requested",
+            "Prescription",
+            prescription.id,
+            f"Medicine: {prescription.medicine_name}",
+        )
         db.session.commit()
         flash("Prescription request submitted successfully.", "success")
         return redirect(url_for("prescriptions.history"))
@@ -99,6 +106,12 @@ def review(prescription_id):
             "Prescription updated",
             f"Your prescription request for {prescription.medicine_name} is now: {prescription.status}.",
         )
+        log_action(
+            "Prescription reviewed",
+            "Prescription",
+            prescription.id,
+            f"Status set to {prescription.status}",
+        )
         db.session.commit()
         flash("Prescription status updated successfully.", "success")
         return redirect(url_for("prescriptions.manage"))
@@ -139,6 +152,12 @@ def pay_prescription(prescription_id):
             prescription.patient_profile.user_id,
             "Prescription payment received",
             f"Payment has been received for {prescription.medicine_name}. Reference: {prescription.payment_reference}.",
+        )
+        log_action(
+            "Prescription payment completed",
+            "Prescription",
+            prescription.id,
+            f"Payment reference: {prescription.payment_reference}",
         )
         db.session.commit()
         flash("Prescription payment completed successfully.", "success")

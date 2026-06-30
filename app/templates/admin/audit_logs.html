@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs - MediQueue{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Audit Logs</h1>
+        <p class="text-muted mb-0">Review important actions recorded across appointments, prescriptions, profiles and authentication.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('admin.dashboard') }}">Back to Dashboard</a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th>Details</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>
+                            <strong>{{ log.created_at.strftime('%d %b %Y') }}</strong><br>
+                            <small class="text-muted">{{ log.created_at.strftime('%H:%M:%S') }}</small>
+                        </td>
+                        <td>{{ log.user.email if log.user else 'System' }}</td>
+                        <td><span class="badge text-bg-primary">{{ log.action }}</span></td>
+                        <td>
+                            {% if log.entity_type %}
+                                {{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ log.details or '-' }}</td>
+                        <td>{{ log.ip_address or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No audit logs recorded yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
