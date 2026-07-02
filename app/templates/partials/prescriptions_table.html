@@ -24,6 +24,10 @@
                             <span class="badge text-bg-danger">Rejected</span>
                         {% elif item.status == 'Under Review' %}
                             <span class="badge text-bg-warning">Under Review</span>
+                        {% elif item.status == 'Ready for Collection' %}
+                            <span class="badge text-bg-info">Ready for Collection</span>
+                        {% elif item.status == 'Collected' %}
+                            <span class="badge text-bg-success">Collected</span>
                         {% else %}
                             <span class="badge text-bg-primary">Requested</span>
                         {% endif %}

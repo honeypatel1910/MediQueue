@@ -3,44 +3,43 @@
 {% block title %}Practice Admin Dashboard | MediQueue{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
-    <h1 class="h3 fw-bold mb-1">MediQueue administration dashboard</h1>
-    <p class="text-muted mb-0">View the current user and role structure for the local GP system.</p>
+<div class="mb-4 d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+    <div>
+        <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
+        <h1 class="h3 fw-bold mb-1">MediQueue administration dashboard</h1>
+        <p class="text-muted mb-0">Monitor users, appointments, prescriptions and recent system activity.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create User</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('admin.appointments') }}">Appointments</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('admin.prescriptions') }}">Prescriptions</a>
+    </div>
 </div>
 
 <div class="row g-4 mb-4">
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="text-muted small mb-1">Total Users</p>
-                <p class="h3 fw-bold mb-0">{{ total_users }}</p>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm h-100"><div class="card-body"><p class="text-muted small mb-1">Total Users</p><p class="h3 fw-bold mb-0">{{ total_users }}</p></div></div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="text-muted small mb-1">Active Users</p>
-                <p class="h3 fw-bold mb-0">{{ active_users }}</p>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm h-100"><div class="card-body"><p class="text-muted small mb-1">Active Users</p><p class="h3 fw-bold mb-0">{{ active_users }}</p></div></div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="text-muted small mb-1">Patients</p>
-                <p class="h3 fw-bold mb-0">{{ total_patients }}</p>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm h-100"><div class="card-body"><p class="text-muted small mb-1">Appointments</p><p class="h3 fw-bold mb-0">{{ total_appointments }}</p></div></div>
     </div>
     <div class="col-md-3">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <p class="text-muted small mb-1">Clinical Staff</p>
-                <p class="h3 fw-bold mb-0">{{ total_staff }}</p>
-            </div>
-        </div>
+        <div class="card border-0 shadow-sm h-100"><div class="card-body"><p class="text-muted small mb-1">Pending Prescriptions</p><p class="h3 fw-bold mb-0">{{ pending_prescriptions }}</p></div></div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body"><p class="text-muted small mb-1">Patients</p><p class="h4 fw-bold mb-0">{{ total_patients }}</p></div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body"><p class="text-muted small mb-1">Clinical Staff</p><p class="h4 fw-bold mb-0">{{ total_staff }}</p></div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body"><p class="text-muted small mb-1">Prescriptions</p><p class="h4 fw-bold mb-0">{{ total_prescriptions }}</p></div></div>
     </div>
 </div>
 
@@ -48,35 +47,23 @@
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
-                <h2 class="h5 fw-bold mb-3">Recent Users</h2>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Recent Users</h2>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.users') }}">Manage Users</a>
+                </div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
                         <tbody>
                             {% for user in recent_users %}
                                 <tr>
                                     <td>{{ user.full_name }}</td>
                                     <td>{{ user.email }}</td>
                                     <td>{{ user.role.name }}</td>
-                                    <td>
-                                        {% if user.active %}
-                                            <span class="badge text-bg-success">Active</span>
-                                        {% else %}
-                                            <span class="badge text-bg-secondary">Inactive</span>
-                                        {% endif %}
-                                    </td>
+                                    <td>{% if user.active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}</td>
                                 </tr>
                             {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-muted">No users found.</td>
-                                </tr>
+                                <tr><td colspan="4" class="text-muted">No users found.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -111,14 +98,7 @@
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>User</th>
-                                <th>Action</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
                         <tbody>
                             {% for log in recent_logs %}
                                 <tr>
@@ -128,9 +108,7 @@
                                     <td>{{ log.details or '-' }}</td>
                                 </tr>
                             {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-muted">No audit activity recorded yet.</td>
-                                </tr>
+                                <tr><td colspan="4" class="text-muted">No audit activity recorded yet.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -139,5 +117,4 @@
         </div>
     </div>
 </div>
-
 {% endblock %}

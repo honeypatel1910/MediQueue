@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Prescription Management | MediQueue{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
+        <h1 class="h3 fw-bold mb-1">Prescription management</h1>
+        <p class="text-muted mb-0">Track prescription requests, payments and collection status.</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="status">Filter by status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All prescriptions</option>
+                    {% for status in status_options %}
+                        <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-auto">
+                <button class="btn btn-outline-primary" type="submit">Apply Filter</button>
+            </div>
+            <div class="col-md-auto">
+                <a class="btn btn-outline-secondary" href="{{ url_for('admin.prescriptions') }}">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Medicine</th>
+                        <th>Patient</th>
+                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Reviewer</th>
+                        <th>Reference</th>
+                        <th class="text-end">Collection</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in prescriptions %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ item.medicine_name }}</div>
+                                <div class="text-muted small">Qty: {{ item.quantity }}</div>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ item.patient_profile.user.full_name }}</div>
+                                <div class="text-muted small">{{ item.patient_profile.user.email }}</div>
+                            </td>
+                            <td>
+                                {% if item.status == 'Approved' %}
+                                    <span class="badge text-bg-success">Approved</span>
+                                {% elif item.status == 'Rejected' %}
+                                    <span class="badge text-bg-danger">Rejected</span>
+                                {% elif item.status == 'Under Review' %}
+                                    <span class="badge text-bg-warning">Under Review</span>
+                                {% elif item.status == 'Ready for Collection' %}
+                                    <span class="badge text-bg-info">Ready for Collection</span>
+                                {% elif item.status == 'Collected' %}
+                                    <span class="badge text-bg-success">Collected</span>
+                                {% else %}
+                                    <span class="badge text-bg-primary">Requested</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.payment_status == 'Pending' %}
+                                    <span class="badge text-bg-warning">Due £{{ '%.2f'|format(item.amount_due or 0) }}</span>
+                                {% elif item.payment_status == 'Paid' %}
+                                    <span class="badge text-bg-success">Paid</span>
+                                {% else %}
+                                    <span class="text-muted small">Not required</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.reviewed_by_staff %}
+                                    <div class="small">{{ item.reviewed_by_staff.user.full_name }}</div>
+                                {% else %}
+                                    <span class="text-muted small">Not reviewed</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.payment_reference %}
+                                    <span class="text-muted small">{{ item.payment_reference }}</span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if item.status in ['Approved', 'Ready for Collection'] and item.payment_status != 'Pending' %}
+                                    <form method="post" action="{{ url_for('admin.update_prescription_collection', prescription_id=item.id) }}" class="d-flex gap-2 justify-content-end">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <select class="form-select form-select-sm w-auto" name="status" aria-label="Collection status">
+                                            <option value="Ready for Collection" {% if item.status == 'Ready for Collection' %}selected{% endif %}>Ready</option>
+                                            <option value="Collected" {% if item.status == 'Collected' %}selected{% endif %}>Collected</option>
+                                        </select>
+                                        <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
+                                    </form>
+                                {% elif item.status == 'Collected' %}
+                                    <span class="text-muted small">Completed</span>
+                                {% elif item.payment_status == 'Pending' %}
+                                    <span class="text-muted small">Awaiting payment</span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">No prescriptions found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

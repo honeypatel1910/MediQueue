@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}User Management | MediQueue{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
+        <h1 class="h3 fw-bold mb-1">User management</h1>
+        <p class="text-muted mb-0">Create accounts and manage access for patients, clinical staff and practice administrators.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">Create User</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="role">Filter by role</label>
+                <select class="form-select" id="role" name="role">
+                    <option value="">All roles</option>
+                    {% for role in roles %}
+                        <option value="{{ role.name }}" {% if role_filter == role.name %}selected{% endif %}>{{ role.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-auto">
+                <button class="btn btn-outline-primary" type="submit">Apply Filter</button>
+            </div>
+            <div class="col-md-auto">
+                <a class="btn btn-outline-secondary" href="{{ url_for('admin.users') }}">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Profile</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td class="fw-semibold">{{ user.full_name }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.role.name }}</td>
+                            <td>
+                                {% if user.patient_profile %}
+                                    <span class="text-muted small">{{ user.patient_profile.patient_reference or 'Patient profile' }}</span>
+                                {% elif user.staff_profile %}
+                                    <div class="small">{{ user.staff_profile.job_title }}</div>
+                                    {% if user.staff_profile.professional_register %}
+                                        <div class="text-muted small">{{ user.staff_profile.professional_register.register_name }} {{ user.staff_profile.professional_register.registration_number }}</div>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted small">Account only</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.active %}
+                                    <span class="badge text-bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge text-bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.created_at.strftime('%d %b %Y') }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ url_for('admin.toggle_user_active', user_id=user.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    {% if user.active %}
+                                        <button class="btn btn-sm btn-outline-secondary" type="submit" {% if user.id == current_user.id %}disabled{% endif %}>Deactivate</button>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-success" type="submit">Activate</button>
+                                    {% endif %}
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">No users found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

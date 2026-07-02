@@ -6,22 +6,26 @@ MediQueue is a secure web-based GP appointment and prescription management syste
 
 - Flask application factory structure
 - Local environment configuration
-- SQLAlchemy database setup
+- PostgreSQL-ready SQLAlchemy configuration with SQLite fallback
 - User and role models
 - Seeded demo accounts
 - Login, logout and patient registration
 - Patient profile and dashboard
 - Doctor and nurse staff profiles
 - Practice admin dashboard
+- Admin user management
+- Admin appointment and prescription management
 - Staff availability management
 - Automatic appointment slot generation
+- Staff availability editing and slot regeneration
 - Patient appointment booking
 - Appointment history and cancellation
 - Staff schedule and appointment status updates
-- Simulated prescription payment flow
-- Doctor prescription review workflow
 - Patient prescription request workflow
-- Staff availability editing and slot regeneration
+- Doctor prescription review workflow
+- Simulated prescription payment flow
+- In-app notifications
+- Audit logging
 
 ## Setup
 
@@ -38,6 +42,17 @@ Open:
 ```text
 http://127.0.0.1:5000
 ```
+
+## PostgreSQL configuration
+
+Create a `.env` file locally and add your PostgreSQL connection string:
+
+```text
+DATABASE_URL=postgresql+psycopg://postgres:your_password@localhost:5432/mediqueue
+SECRET_KEY=change-this-secret-key
+```
+
+If `DATABASE_URL` is not set, the app falls back to SQLite for local development.
 
 ## Demo accounts
 

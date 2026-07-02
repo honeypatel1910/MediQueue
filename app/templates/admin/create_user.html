@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Create User | MediQueue{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
+    <h1 class="h3 fw-bold mb-1">Create user account</h1>
+    <p class="text-muted mb-0">Add a patient, doctor, nurse or practice admin account.</p>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <form method="post" novalidate>
+            {{ form.hidden_tag() }}
+
+            <h2 class="h5 fw-bold mb-3">Account details</h2>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    {{ form.first_name.label(class="form-label") }}
+                    {{ form.first_name(class="form-control") }}
+                    {% for error in form.first_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    {{ form.last_name.label(class="form-label") }}
+                    {{ form.last_name(class="form-control") }}
+                    {% for error in form.last_name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    {{ form.email.label(class="form-label") }}
+                    {{ form.email(class="form-control") }}
+                    {% for error in form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    {{ form.role_id.label(class="form-label") }}
+                    {{ form.role_id(class="form-select") }}
+                    {% for error in form.role_id.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control") }}
+                    {% for error in form.password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                    {{ form.confirm_password.label(class="form-label") }}
+                    {{ form.confirm_password(class="form-control") }}
+                    {% for error in form.confirm_password.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        {{ form.active(class="form-check-input") }}
+                        {{ form.active.label(class="form-check-label") }}
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="h5 fw-bold mb-3">Patient details</h2>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    {{ form.phone.label(class="form-label") }}
+                    {{ form.phone(class="form-control") }}
+                </div>
+                <div class="col-md-6">
+                    {{ form.address.label(class="form-label") }}
+                    {{ form.address(class="form-control") }}
+                </div>
+            </div>
+
+            <h2 class="h5 fw-bold mb-3">Clinical staff details</h2>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    {{ form.job_title.label(class="form-label") }}
+                    {{ form.job_title(class="form-control") }}
+                </div>
+                <div class="col-md-6">
+                    {{ form.department.label(class="form-label") }}
+                    {{ form.department(class="form-control") }}
+                </div>
+                <div class="col-md-4">
+                    {{ form.phone_extension.label(class="form-label") }}
+                    {{ form.phone_extension(class="form-control") }}
+                </div>
+                <div class="col-md-4">
+                    {{ form.register_name.label(class="form-label") }}
+                    {{ form.register_name(class="form-control", placeholder="GMC or NMC") }}
+                </div>
+                <div class="col-md-4">
+                    {{ form.registration_number.label(class="form-label") }}
+                    {{ form.registration_number(class="form-control") }}
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        {{ form.verified(class="form-check-input") }}
+                        {{ form.verified.label(class="form-check-label") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a class="btn btn-outline-secondary" href="{{ url_for('admin.users') }}">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Appointment Management | MediQueue{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+        <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
+        <h1 class="h3 fw-bold mb-1">Appointment management</h1>
+        <p class="text-muted mb-0">View all patient bookings and appointment outcomes across the practice.</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="status">Filter by status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All appointments</option>
+                    {% for status in status_options %}
+                        <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-auto">
+                <button class="btn btn-outline-primary" type="submit">Apply Filter</button>
+            </div>
+            <div class="col-md-auto">
+                <a class="btn btn-outline-secondary" href="{{ url_for('admin.appointments') }}">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Patient</th>
+                        <th>Clinical Staff</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for appointment in appointments %}
+                        <tr>
+                            <td>{{ appointment.slot.start_at.strftime('%d %b %Y') }}</td>
+                            <td>{{ appointment.slot.start_at.strftime('%H:%M') }}–{{ appointment.slot.end_at.strftime('%H:%M') }}</td>
+                            <td>
+                                <div class="fw-semibold">{{ appointment.patient_profile.user.full_name }}</div>
+                                <div class="text-muted small">{{ appointment.patient_profile.user.email }}</div>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ appointment.staff_profile.user.full_name }}</div>
+                                <div class="text-muted small">{{ appointment.staff_profile.job_title }}</div>
+                            </td>
+                            <td>{{ appointment.reason or '-' }}</td>
+                            <td>
+                                {% if appointment.status == 'Booked' %}
+                                    <span class="badge text-bg-primary">Booked</span>
+                                {% elif appointment.status == 'Completed' %}
+                                    <span class="badge text-bg-success">Completed</span>
+                                {% elif appointment.status == 'Cancelled' %}
+                                    <span class="badge text-bg-secondary">Cancelled</span>
+                                {% elif appointment.status == 'Missed' %}
+                                    <span class="badge text-bg-warning">Missed</span>
+                                {% else %}
+                                    <span class="badge text-bg-light">{{ appointment.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ appointment.created_at.strftime('%d %b %Y') }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">No appointments found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
