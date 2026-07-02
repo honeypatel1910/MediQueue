@@ -27,6 +27,7 @@ MediQueue is a secure web-based GP appointment and prescription management syste
 - In-app notifications
 - Audit logging
 - CSV report exports for appointments and prescriptions
+- JSON API foundation for React authentication
 
 ## Setup
 
@@ -71,3 +72,17 @@ flask --app run.py reset-db --yes
 flask --app run.py seed-data
 flask --app run.py check-logins
 ```
+
+## API foundation
+
+Initial JSON API endpoints are available for the React frontend:
+
+```text
+/api/health
+/api/session
+/api/login
+/api/logout
+/api/register
+```
+
+These endpoints use the same Flask-Login session as the server-rendered pages.
