@@ -26,6 +26,7 @@ MediQueue is a secure web-based GP appointment and prescription management syste
 - Simulated prescription payment flow
 - In-app notifications
 - Audit logging
+- CSV report exports for appointments and prescriptions
 
 ## Setup
 

@@ -37,6 +37,7 @@
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.users') }}">Users</a></li>
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.appointments') }}">Appointments</a></li>
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.prescriptions') }}">Prescriptions</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{{ url_for('reports.index') }}">Reports</a></li>
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin.audit_logs') }}">Audit Logs</a></li>
                         {% else %}
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.account') }}">Account</a></li>
