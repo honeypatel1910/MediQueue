@@ -1,9 +1,11 @@
+from datetime import date
+
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
-from app.models import Notification, PatientProfile, Role, User
+from app.models import Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
 from app.services import log_action
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -18,6 +20,13 @@ def role_to_frontend(role_name):
         "Nurse": "nurse",
         "Practice Admin": "admin",
     }.get(role_name, "patient")
+
+
+def payment_to_frontend(status):
+    """Map backend payment labels to frontend display values."""
+    if status == "Not Required":
+        return "Not required"
+    return status or "Not required"
 
 
 def user_json(user):
@@ -36,6 +45,7 @@ def user_json(user):
                 "jobTitle": user.staff_profile.job_title,
                 "department": user.staff_profile.department,
                 "phoneExtension": user.staff_profile.phone_extension,
+                "specialisation": user.staff_profile.department or user.staff_profile.job_title,
             }
         )
 
@@ -43,6 +53,71 @@ def user_json(user):
         payload["patientReference"] = user.patient_profile.patient_reference
 
     return payload
+
+
+def appointment_json(appointment):
+    """Return appointment data in the format used by the React frontend."""
+    slot = appointment.slot
+    staff = appointment.staff_profile
+    patient = appointment.patient_profile
+    duration = 0
+    if slot and slot.start_at and slot.end_at:
+        duration = int((slot.end_at - slot.start_at).total_seconds() // 60)
+
+    staff_role = staff.user.role.name if staff and staff.user and staff.user.role else "Doctor"
+
+    return {
+        "id": str(appointment.id),
+        "patientName": patient.user.full_name if patient and patient.user else "Patient",
+        "doctorName": staff.user.full_name if staff and staff.user else "Clinical staff",
+        "doctorRole": staff_role,
+        "specialisation": staff.department or staff.job_title if staff else "General Practice",
+        "date": slot.start_at.date().isoformat() if slot and slot.start_at else "",
+        "time": slot.start_at.strftime("%H:%M") if slot and slot.start_at else "",
+        "reason": appointment.reason or "",
+        "status": appointment.status,
+        "duration": duration,
+    }
+
+
+def prescription_json(prescription):
+    """Return prescription data in the format used by the React frontend."""
+    return {
+        "id": str(prescription.id),
+        "patientName": prescription.patient_profile.user.full_name if prescription.patient_profile and prescription.patient_profile.user else "Patient",
+        "medicine": prescription.medicine_name,
+        "quantity": prescription.quantity,
+        "reason": prescription.reason or "",
+        "requestedDate": prescription.created_at.date().isoformat() if prescription.created_at else "",
+        "status": prescription.status,
+        "paymentStatus": payment_to_frontend(prescription.payment_status),
+        "reviewedBy": prescription.reviewed_by_staff.user.full_name if prescription.reviewed_by_staff and prescription.reviewed_by_staff.user else None,
+        "amountDue": float(prescription.amount_due or 0.0),
+        "paymentReference": prescription.payment_reference,
+    }
+
+
+def notification_json(notification):
+    """Return notification data in the format used by the React frontend."""
+    title = (notification.title or "").lower()
+    type_name = "appointment_booked"
+    if "cancel" in title:
+        type_name = "appointment_cancelled"
+    elif "payment" in title:
+        type_name = "payment_received"
+    elif "ready" in title:
+        type_name = "prescription_ready"
+    elif "prescription" in title:
+        type_name = "prescription_approved"
+
+    return {
+        "id": str(notification.id),
+        "type": type_name,
+        "title": notification.title,
+        "message": notification.message,
+        "timestamp": notification.created_at.isoformat() if notification.created_at else "",
+        "read": bool(notification.is_read),
+    }
 
 
 def json_error(message, status=400):
@@ -161,3 +236,118 @@ def register():
         return json_error("This account could not be created. Please check the details and try again.")
 
     return jsonify({"ok": True, "user": user_json(user)}), 201
+
+
+@api_bp.get("/patient/dashboard")
+@login_required
+def patient_dashboard():
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    profile = current_user.patient_profile
+    if profile is None:
+        return json_error("Patient profile was not found.", 404)
+
+    appointments = (
+        Appointment.query.filter_by(patient_profile_id=profile.id)
+        .join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .order_by(AppointmentSlot.start_at.desc())
+        .limit(20)
+        .all()
+    )
+    prescriptions = (
+        Prescription.query.filter_by(patient_profile_id=profile.id)
+        .order_by(Prescription.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    notifications = (
+        Notification.query.filter_by(user_id=current_user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "appointments": [appointment_json(item) for item in appointments],
+            "prescriptions": [prescription_json(item) for item in prescriptions],
+            "notifications": [notification_json(item) for item in notifications],
+        }
+    )
+
+
+@api_bp.get("/patient/profile")
+@login_required
+def get_patient_profile():
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    profile = current_user.patient_profile
+    if profile is None:
+        return json_error("Patient profile was not found.", 404)
+
+    return jsonify(
+        {
+            "ok": True,
+            "profile": {
+                "firstName": current_user.first_name,
+                "lastName": current_user.last_name,
+                "email": current_user.email,
+                "patientReference": profile.patient_reference or "",
+                "phone": profile.phone or "",
+                "address": profile.address or "",
+                "dateOfBirth": profile.date_of_birth.isoformat() if profile.date_of_birth else "",
+            },
+        }
+    )
+
+
+@api_bp.put("/patient/profile")
+@login_required
+def update_patient_profile():
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    data = request.get_json(silent=True) or {}
+    profile = current_user.patient_profile
+    if profile is None:
+        return json_error("Patient profile was not found.", 404)
+
+    first_name = (data.get("firstName") or "").strip()
+    last_name = (data.get("lastName") or "").strip()
+    if not first_name or not last_name:
+        return json_error("First name and last name are required.")
+
+    current_user.first_name = first_name
+    current_user.last_name = last_name
+    profile.phone = (data.get("phone") or "").strip()
+    profile.address = (data.get("address") or "").strip()
+
+    dob = data.get("dateOfBirth")
+    if dob:
+        try:
+            profile.date_of_birth = date.fromisoformat(dob)
+        except ValueError:
+            return json_error("Invalid date of birth.")
+    else:
+        profile.date_of_birth = None
+
+    log_action("Patient profile updated", "PatientProfile", profile.id, "Patient updated their profile through API")
+    db.session.commit()
+
+    return jsonify(
+        {
+            "ok": True,
+            "profile": {
+                "firstName": current_user.first_name,
+                "lastName": current_user.last_name,
+                "email": current_user.email,
+                "patientReference": profile.patient_reference or "",
+                "phone": profile.phone or "",
+                "address": profile.address or "",
+                "dateOfBirth": profile.date_of_birth.isoformat() if profile.date_of_birth else "",
+            },
+        }
+    )

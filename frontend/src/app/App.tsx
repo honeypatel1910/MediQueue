@@ -5,6 +5,8 @@ import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { Layout } from './components/shared/Layout';
 import { StatusBadge } from './components/shared/StatusBadge';
+import { PatientDashboard } from './components/patient/PatientDashboard';
+import { PatientProfile } from './components/patient/PatientProfile';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -128,9 +130,16 @@ function AppRouter() {
 
   const title = PAGE_TITLES[currentPage] ?? 'Dashboard';
 
+  let content = <DashboardOverview />;
+  if (currentPage === 'patient-dashboard') {
+    content = <PatientDashboard />;
+  } else if (currentPage === 'patient-profile') {
+    content = <PatientProfile />;
+  }
+
   return (
     <Layout title={title}>
-      <DashboardOverview />
+      {content}
     </Layout>
   );
 }
