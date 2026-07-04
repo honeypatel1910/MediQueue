@@ -7,6 +7,8 @@ import { Layout } from './components/shared/Layout';
 import { StatusBadge } from './components/shared/StatusBadge';
 import { PatientDashboard } from './components/patient/PatientDashboard';
 import { PatientProfile } from './components/patient/PatientProfile';
+import { DoctorDashboard } from './components/doctor/DoctorDashboard';
+import { NurseDashboard } from './components/nurse/NurseDashboard';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -135,6 +137,10 @@ function AppRouter() {
     content = <PatientDashboard />;
   } else if (currentPage === 'patient-profile') {
     content = <PatientProfile />;
+  } else if (currentPage === 'doctor-dashboard') {
+    content = <DoctorDashboard />;
+  } else if (currentPage === 'nurse-dashboard') {
+    content = <NurseDashboard />;
   }
 
   return (

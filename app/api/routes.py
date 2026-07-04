@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
@@ -351,3 +351,51 @@ def update_patient_profile():
             },
         }
     )
+
+@api_bp.get("/staff/dashboard")
+@login_required
+def staff_dashboard():
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    today_start = datetime.combine(date.today(), time.min)
+    today_end = datetime.combine(date.today(), time.max)
+
+    today_appointments = (
+        Appointment.query.filter_by(staff_profile_id=staff.id)
+        .join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(AppointmentSlot.start_at >= today_start, AppointmentSlot.start_at <= today_end)
+        .order_by(AppointmentSlot.start_at.asc())
+        .all()
+    )
+
+    schedule = (
+        Appointment.query.filter_by(staff_profile_id=staff.id)
+        .join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .order_by(AppointmentSlot.start_at.asc())
+        .limit(20)
+        .all()
+    )
+
+    prescriptions = []
+    if current_user.has_role("Doctor"):
+        prescriptions = (
+            Prescription.query.filter(Prescription.status.in_(["Requested", "Under Review"]))
+            .order_by(Prescription.created_at.asc())
+            .limit(20)
+            .all()
+        )
+
+    return jsonify(
+        {
+            "ok": True,
+            "todayAppointments": [appointment_json(item) for item in today_appointments],
+            "schedule": [appointment_json(item) for item in schedule],
+            "prescriptions": [prescription_json(item) for item in prescriptions],
+        }
+    )
+
