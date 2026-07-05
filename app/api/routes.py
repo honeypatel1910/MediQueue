@@ -5,8 +5,8 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
-from app.models import Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
-from app.services import log_action
+from app.models import AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
+from app.services import generate_slots_for_availability, log_action
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 csrf.exempt(api_bp)
@@ -77,6 +77,38 @@ def appointment_json(appointment):
         "reason": appointment.reason or "",
         "status": appointment.status,
         "duration": duration,
+    }
+
+
+def availability_block_json(block):
+    """Return staff availability and generated slots for the React frontend."""
+    appointment_count = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(AppointmentSlot.availability_block_id == block.id)
+        .count()
+    )
+
+    slots = []
+    for slot in sorted(block.slots or [], key=lambda item: item.start_at):
+        slots.append(
+            {
+                "id": str(slot.id),
+                "startTime": slot.start_at.strftime("%H:%M") if slot.start_at else "",
+                "endTime": slot.end_at.strftime("%H:%M") if slot.end_at else "",
+                "status": slot.status,
+            }
+        )
+
+    return {
+        "id": str(block.id),
+        "date": block.available_date.isoformat() if block.available_date else "",
+        "startTime": block.start_time.strftime("%H:%M") if block.start_time else "",
+        "endTime": block.end_time.strftime("%H:%M") if block.end_time else "",
+        "slotDuration": block.slot_duration_minutes,
+        "location": block.location,
+        "slotCount": len(slots),
+        "canEdit": appointment_count == 0,
+        "slots": slots,
     }
 
 
@@ -399,3 +431,144 @@ def staff_dashboard():
         }
     )
 
+
+
+
+def parse_availability_payload(data):
+    """Validate availability payload from React staff availability forms."""
+    available_date = data.get("date") or data.get("availableDate")
+    start_time_value = data.get("startTime")
+    end_time_value = data.get("endTime")
+    slot_duration = data.get("slotDuration") or data.get("slotDurationMinutes") or 20
+    location = (data.get("location") or "GP Practice").strip() or "GP Practice"
+
+    try:
+        parsed_date = date.fromisoformat(available_date)
+        parsed_start = time.fromisoformat(start_time_value)
+        parsed_end = time.fromisoformat(end_time_value)
+        parsed_duration = int(slot_duration)
+    except (TypeError, ValueError):
+        raise ValueError("Please provide a valid date, time and slot duration.")
+
+    if parsed_date < date.today():
+        raise ValueError("Availability must be for today or a future date.")
+
+    if parsed_end <= parsed_start:
+        raise ValueError("End time must be after start time.")
+
+    if parsed_duration < 5 or parsed_duration > 120:
+        raise ValueError("Slot duration must be between 5 and 120 minutes.")
+
+    start_dt = datetime.combine(parsed_date, parsed_start)
+    end_dt = datetime.combine(parsed_date, parsed_end)
+    if (end_dt - start_dt).total_seconds() // 60 < parsed_duration:
+        raise ValueError("Availability window must be at least one slot long.")
+
+    return parsed_date, parsed_start, parsed_end, parsed_duration, location
+
+
+def availability_has_appointments(block_id):
+    """Return True if generated slots are already linked to appointment records."""
+    return (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(AppointmentSlot.availability_block_id == block_id)
+        .first()
+        is not None
+    )
+
+
+@api_bp.get("/staff/availability")
+@login_required
+def staff_availability():
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    blocks = (
+        AvailabilityBlock.query.filter_by(staff_profile_id=staff.id)
+        .order_by(AvailabilityBlock.available_date.desc(), AvailabilityBlock.start_time.asc())
+        .all()
+    )
+
+    return jsonify({"ok": True, "availability": [availability_block_json(block) for block in blocks]})
+
+
+@api_bp.post("/staff/availability")
+@login_required
+def create_staff_availability():
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    data = request.get_json(silent=True) or {}
+    try:
+        available_date, start_time_value, end_time_value, slot_duration, location = parse_availability_payload(data)
+    except ValueError as exc:
+        return json_error(str(exc), 400)
+
+    block = AvailabilityBlock(
+        staff_profile_id=staff.id,
+        available_date=available_date,
+        start_time=start_time_value,
+        end_time=end_time_value,
+        slot_duration_minutes=slot_duration,
+        location=location,
+    )
+    db.session.add(block)
+    db.session.flush()
+    generated = generate_slots_for_availability(block)
+    log_action(
+        "Availability created",
+        "AvailabilityBlock",
+        block.id,
+        f"{available_date.isoformat()} {start_time_value.strftime('%H:%M')}-{end_time_value.strftime('%H:%M')} generated {len(generated)} slots",
+    )
+    db.session.commit()
+
+    return jsonify({"ok": True, "availability": availability_block_json(block)}), 201
+
+
+@api_bp.put("/staff/availability/<int:block_id>")
+@login_required
+def update_staff_availability(block_id):
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    block = AvailabilityBlock.query.filter_by(id=block_id, staff_profile_id=staff.id).first()
+    if block is None:
+        return json_error("Availability was not found.", 404)
+
+    if availability_has_appointments(block.id):
+        return json_error("Availability linked to appointments cannot be edited.", 409)
+
+    data = request.get_json(silent=True) or {}
+    try:
+        available_date, start_time_value, end_time_value, slot_duration, location = parse_availability_payload(data)
+    except ValueError as exc:
+        return json_error(str(exc), 400)
+
+    block.available_date = available_date
+    block.start_time = start_time_value
+    block.end_time = end_time_value
+    block.slot_duration_minutes = slot_duration
+    block.location = location
+    generated = generate_slots_for_availability(block)
+    log_action(
+        "Availability updated",
+        "AvailabilityBlock",
+        block.id,
+        f"{available_date.isoformat()} {start_time_value.strftime('%H:%M')}-{end_time_value.strftime('%H:%M')} regenerated {len(generated)} slots",
+    )
+    db.session.commit()
+
+    return jsonify({"ok": True, "availability": availability_block_json(block)})

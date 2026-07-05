@@ -92,6 +92,26 @@ export interface AvailabilitySlot {
   specialisation?: string;
 }
 
+
+export interface StaffAvailabilityGeneratedSlot {
+  id: string;
+  startTime: string;
+  endTime: string;
+  status: 'Available' | 'Booked' | string;
+}
+
+export interface StaffAvailabilityBlock {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  slotDuration: number;
+  location: string;
+  slotCount: number;
+  canEdit: boolean;
+  slots: StaffAvailabilityGeneratedSlot[];
+}
+
 export type Page =
   | 'landing'
   | 'login'

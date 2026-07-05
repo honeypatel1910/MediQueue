@@ -9,6 +9,7 @@ import { PatientDashboard } from './components/patient/PatientDashboard';
 import { PatientProfile } from './components/patient/PatientProfile';
 import { DoctorDashboard } from './components/doctor/DoctorDashboard';
 import { NurseDashboard } from './components/nurse/NurseDashboard';
+import { Availability } from './components/doctor/Availability';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -141,6 +142,8 @@ function AppRouter() {
     content = <DoctorDashboard />;
   } else if (currentPage === 'nurse-dashboard') {
     content = <NurseDashboard />;
+  } else if (currentPage === 'doctor-availability' || currentPage === 'nurse-availability') {
+    content = <Availability />;
   }
 
   return (
