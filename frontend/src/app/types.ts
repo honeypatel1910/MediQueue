@@ -11,6 +11,7 @@ export interface User {
   department?: string | null;
   phoneExtension?: string | null;
   specialisation?: string;
+  location?: string;
 }
 
 export interface SessionResponse {
@@ -90,6 +91,7 @@ export interface AvailabilitySlot {
   booked: boolean;
   role?: 'Doctor' | 'Nurse';
   specialisation?: string;
+  location?: string;
 }
 
 

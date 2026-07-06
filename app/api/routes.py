@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
 from app.models import AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
-from app.services import generate_slots_for_availability, log_action
+from app.services import book_appointment, generate_slots_for_availability, log_action
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 csrf.exempt(api_bp)
@@ -109,6 +109,29 @@ def availability_block_json(block):
         "slotCount": len(slots),
         "canEdit": appointment_count == 0,
         "slots": slots,
+    }
+
+
+def available_slot_json(slot):
+    """Return a bookable appointment slot for the React frontend."""
+    staff = slot.staff_profile
+    staff_user = staff.user if staff else None
+    staff_role = staff_user.role.name if staff_user and staff_user.role else "Doctor"
+    duration = 0
+    if slot.start_at and slot.end_at:
+        duration = int((slot.end_at - slot.start_at).total_seconds() // 60)
+
+    return {
+        "id": str(slot.id),
+        "staffId": str(staff.id) if staff else "",
+        "staffName": staff_user.full_name if staff_user else "Clinical staff",
+        "date": slot.start_at.date().isoformat() if slot.start_at else "",
+        "time": slot.start_at.strftime("%H:%M") if slot.start_at else "",
+        "duration": duration,
+        "booked": slot.status != "Available",
+        "role": staff_role,
+        "specialisation": staff.department or staff.job_title if staff else "General Practice",
+        "location": slot.availability_block.location if slot.availability_block else "GP Practice",
     }
 
 
@@ -572,3 +595,79 @@ def update_staff_availability(block_id):
     db.session.commit()
 
     return jsonify({"ok": True, "availability": availability_block_json(block)})
+
+@api_bp.get("/appointments/available")
+@login_required
+def available_appointments():
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    query = (
+        AppointmentSlot.query.join(AvailabilityBlock, AppointmentSlot.availability_block_id == AvailabilityBlock.id)
+        .filter(AppointmentSlot.status == "Available")
+        .filter(AppointmentSlot.start_at > datetime.now())
+    )
+
+    date_filter = (request.args.get("date") or "").strip()
+    if date_filter:
+        try:
+            selected_date = date.fromisoformat(date_filter)
+        except ValueError:
+            return json_error("Please provide a valid appointment date.", 400)
+        query = query.filter(
+            AppointmentSlot.start_at >= datetime.combine(selected_date, time.min),
+            AppointmentSlot.start_at <= datetime.combine(selected_date, time.max),
+        )
+
+    staff_id = (request.args.get("staffId") or "").strip()
+    if staff_id:
+        try:
+            query = query.filter(AvailabilityBlock.staff_profile_id == int(staff_id))
+        except ValueError:
+            return json_error("Please provide a valid staff member.", 400)
+
+    role_filter = (request.args.get("role") or "").strip().lower()
+
+    slots = query.order_by(AppointmentSlot.start_at.asc()).limit(100).all()
+    slot_payload = [available_slot_json(slot) for slot in slots]
+    if role_filter in {"doctor", "nurse"}:
+        slot_payload = [slot for slot in slot_payload if slot.get("role", "").lower() == role_filter]
+
+    staff_options = {}
+    for slot in slot_payload:
+        staff_options[slot["staffId"]] = {
+            "id": slot["staffId"],
+            "name": slot["staffName"],
+            "role": slot.get("role", "Doctor"),
+            "specialisation": slot.get("specialisation", "General Practice"),
+        }
+
+    return jsonify({"ok": True, "slots": slot_payload, "staff": list(staff_options.values())})
+
+
+@api_bp.post("/appointments/book")
+@login_required
+def book_available_appointment():
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    profile = current_user.patient_profile
+    if profile is None:
+        return json_error("Patient profile was not found.", 404)
+
+    data = request.get_json(silent=True) or {}
+    slot_id = data.get("slotId") or data.get("slot_id")
+    reason = (data.get("reason") or "").strip()
+
+    if not slot_id:
+        return json_error("Please choose an appointment slot.", 400)
+
+    try:
+        appointment = book_appointment(profile, int(slot_id), reason=reason)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return json_error(str(exc), 400)
+
+    return jsonify({"ok": True, "appointment": appointment_json(appointment)})
+

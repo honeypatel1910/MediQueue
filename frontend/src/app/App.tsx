@@ -7,6 +7,7 @@ import { Layout } from './components/shared/Layout';
 import { StatusBadge } from './components/shared/StatusBadge';
 import { PatientDashboard } from './components/patient/PatientDashboard';
 import { PatientProfile } from './components/patient/PatientProfile';
+import { BookAppointment } from './components/patient/BookAppointment';
 import { DoctorDashboard } from './components/doctor/DoctorDashboard';
 import { NurseDashboard } from './components/nurse/NurseDashboard';
 import { Availability } from './components/doctor/Availability';
@@ -138,6 +139,8 @@ function AppRouter() {
     content = <PatientDashboard />;
   } else if (currentPage === 'patient-profile') {
     content = <PatientProfile />;
+  } else if (currentPage === 'book-appointment') {
+    content = <BookAppointment />;
   } else if (currentPage === 'doctor-dashboard') {
     content = <DoctorDashboard />;
   } else if (currentPage === 'nurse-dashboard') {
