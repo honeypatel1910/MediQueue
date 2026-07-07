@@ -9,6 +9,7 @@ import { PatientDashboard } from './components/patient/PatientDashboard';
 import { PatientProfile } from './components/patient/PatientProfile';
 import { BookAppointment } from './components/patient/BookAppointment';
 import { AppointmentHistory } from './components/patient/AppointmentHistory';
+import { PrescriptionRequest } from './components/patient/PrescriptionRequest';
 import { DoctorDashboard } from './components/doctor/DoctorDashboard';
 import { NurseDashboard } from './components/nurse/NurseDashboard';
 import { Availability } from './components/doctor/Availability';
@@ -145,6 +146,8 @@ function AppRouter() {
     content = <BookAppointment />;
   } else if (currentPage === 'appointment-history') {
     content = <AppointmentHistory />;
+  } else if (currentPage === 'prescription-request') {
+    content = <PrescriptionRequest />;
   } else if (currentPage === 'doctor-dashboard') {
     content = <DoctorDashboard />;
   } else if (currentPage === 'nurse-dashboard') {

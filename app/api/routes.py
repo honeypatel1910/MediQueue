@@ -780,3 +780,43 @@ def book_available_appointment():
 
     return jsonify({"ok": True, "appointment": appointment_json(appointment)})
 
+@api_bp.post("/prescriptions/request")
+@login_required
+def request_prescription_from_api():
+    """Create a patient prescription request from the React frontend."""
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    profile = current_user.patient_profile
+    if profile is None:
+        return json_error("Patient profile was not found.", 404)
+
+    data = request.get_json(silent=True) or {}
+    medicine = (data.get("medicine") or data.get("medicineName") or "").strip()
+    quantity = (data.get("quantity") or "").strip()
+    reason = (data.get("reason") or "").strip()
+
+    if not medicine or not quantity:
+        return json_error("Medicine name and quantity are required.", 400)
+
+    prescription = Prescription(
+        patient_profile_id=profile.id,
+        medicine_name=medicine,
+        quantity=quantity,
+        reason=reason,
+        status="Requested",
+        payment_status="Not Required",
+        amount_due=0.0,
+    )
+    db.session.add(prescription)
+    db.session.flush()
+    log_action(
+        "Prescription requested",
+        "Prescription",
+        prescription.id,
+        f"Medicine: {prescription.medicine_name}",
+    )
+    db.session.commit()
+
+    return jsonify({"ok": True, "prescription": prescription_json(prescription)}), 201
+
