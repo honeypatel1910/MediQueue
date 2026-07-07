@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
 from app.models import AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
-from app.services import book_appointment, generate_slots_for_availability, log_action
+from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, update_appointment_status
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 csrf.exempt(api_bp)
@@ -595,6 +595,115 @@ def update_staff_availability(block_id):
     db.session.commit()
 
     return jsonify({"ok": True, "availability": availability_block_json(block)})
+
+
+@api_bp.get("/appointments")
+@login_required
+def appointments():
+    """Return appointments for the logged-in patient, staff member, or admin."""
+    if current_user.has_role("Patient"):
+        profile = current_user.patient_profile
+        if profile is None:
+            return json_error("Patient profile was not found.", 404)
+        items = (
+            Appointment.query.filter_by(patient_profile_id=profile.id)
+            .join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+            .order_by(AppointmentSlot.start_at.desc())
+            .all()
+        )
+    elif current_user.has_role("Doctor", "Nurse"):
+        staff = current_user.staff_profile
+        if staff is None:
+            return json_error("Staff profile was not found.", 404)
+        items = (
+            Appointment.query.filter_by(staff_profile_id=staff.id)
+            .join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+            .order_by(AppointmentSlot.start_at.desc())
+            .all()
+        )
+    elif current_user.has_role("Practice Admin"):
+        items = Appointment.query.order_by(Appointment.created_at.desc()).all()
+    else:
+        return json_error("Access denied.", 403)
+
+    return jsonify({"ok": True, "appointments": [appointment_json(item) for item in items]})
+
+
+@api_bp.post("/appointments/<int:appointment_id>/cancel")
+@login_required
+def cancel_existing_appointment(appointment_id):
+    """Cancel an appointment from the React patient/staff UI."""
+    appointment = Appointment.query.get_or_404(appointment_id)
+
+    allowed = False
+    if current_user.has_role("Patient") and appointment.patient_profile.user_id == current_user.id:
+        allowed = True
+    elif current_user.has_role("Doctor", "Nurse") and appointment.staff_profile.user_id == current_user.id:
+        allowed = True
+    elif current_user.has_role("Practice Admin"):
+        allowed = True
+
+    if not allowed:
+        return json_error("You do not have permission to cancel this appointment.", 403)
+
+    try:
+        cancel_appointment(appointment)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return json_error(str(exc), 400)
+
+    return jsonify({"ok": True, "appointment": appointment_json(appointment)})
+
+
+@api_bp.get("/staff/schedule")
+@login_required
+def staff_schedule():
+    """Return the logged-in doctor or nurse appointment schedule."""
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    items = (
+        Appointment.query.filter_by(staff_profile_id=staff.id)
+        .join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .order_by(AppointmentSlot.start_at.asc())
+        .all()
+    )
+    return jsonify({"ok": True, "appointments": [appointment_json(item) for item in items]})
+
+
+@api_bp.post("/staff/appointments/<int:appointment_id>/status")
+@login_required
+def update_staff_appointment_status(appointment_id):
+    """Allow staff to update appointment outcomes from the React schedule page."""
+    if not current_user.has_role("Doctor", "Nurse", "Practice Admin"):
+        return json_error("Staff or admin access required.", 403)
+
+    appointment = Appointment.query.get_or_404(appointment_id)
+    if current_user.has_role("Doctor", "Nurse"):
+        staff = current_user.staff_profile
+        if staff is None or appointment.staff_profile_id != staff.id:
+            return json_error("You can only update your own appointments.", 403)
+
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    internal_note = (data.get("internalNote") or "").strip()
+
+    try:
+        if status == "Cancelled":
+            cancel_appointment(appointment)
+        else:
+            update_appointment_status(appointment, status, internal_note)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return json_error(str(exc), 400)
+
+    return jsonify({"ok": True, "appointment": appointment_json(appointment)})
 
 @api_bp.get("/appointments/available")
 @login_required

@@ -8,9 +8,11 @@ import { StatusBadge } from './components/shared/StatusBadge';
 import { PatientDashboard } from './components/patient/PatientDashboard';
 import { PatientProfile } from './components/patient/PatientProfile';
 import { BookAppointment } from './components/patient/BookAppointment';
+import { AppointmentHistory } from './components/patient/AppointmentHistory';
 import { DoctorDashboard } from './components/doctor/DoctorDashboard';
 import { NurseDashboard } from './components/nurse/NurseDashboard';
 import { Availability } from './components/doctor/Availability';
+import { DoctorSchedule } from './components/doctor/DoctorSchedule';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -141,10 +143,14 @@ function AppRouter() {
     content = <PatientProfile />;
   } else if (currentPage === 'book-appointment') {
     content = <BookAppointment />;
+  } else if (currentPage === 'appointment-history') {
+    content = <AppointmentHistory />;
   } else if (currentPage === 'doctor-dashboard') {
     content = <DoctorDashboard />;
   } else if (currentPage === 'nurse-dashboard') {
     content = <NurseDashboard />;
+  } else if (currentPage === 'doctor-schedule' || currentPage === 'nurse-schedule') {
+    content = <DoctorSchedule staffName={currentUser.name} />;
   } else if (currentPage === 'doctor-availability' || currentPage === 'nurse-availability') {
     content = <Availability />;
   }
