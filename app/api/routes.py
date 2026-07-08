@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
 from app.models import AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
+from app.prescriptions.routes import PRESCRIPTION_STANDARD_FEE
 from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, notify_user, update_appointment_status
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -785,20 +786,77 @@ def book_available_appointment():
 @api_bp.get("/prescriptions")
 @login_required
 def list_prescriptions_from_api():
-    """Return prescriptions for the logged-in patient."""
-    if not current_user.has_role("Patient"):
-        return json_error("Patient access required.", 403)
+    """Return prescriptions for the current role.
 
-    profile = current_user.patient_profile
-    if profile is None:
-        return json_error("Patient profile was not found.", 404)
+    Patients see their own requests. Doctors see the review queue used by the
+    React prescription review page.
+    """
+    if current_user.has_role("Patient"):
+        profile = current_user.patient_profile
+        if profile is None:
+            return json_error("Patient profile was not found.", 404)
 
-    prescriptions = (
-        Prescription.query.filter_by(patient_profile_id=profile.id)
-        .order_by(Prescription.created_at.desc())
-        .all()
+        prescriptions = (
+            Prescription.query.filter_by(patient_profile_id=profile.id)
+            .order_by(Prescription.created_at.desc())
+            .all()
+        )
+        return jsonify({"ok": True, "prescriptions": [prescription_json(item) for item in prescriptions]})
+
+    if current_user.has_role("Doctor"):
+        prescriptions = (
+            Prescription.query.filter(Prescription.status.in_(["Requested", "Under Review", "Approved", "Rejected"]))
+            .order_by(Prescription.created_at.desc())
+            .all()
+        )
+        return jsonify({"ok": True, "prescriptions": [prescription_json(item) for item in prescriptions]})
+
+    return json_error("Prescription access required.", 403)
+
+
+@api_bp.post("/prescriptions/<int:prescription_id>/review")
+@login_required
+def review_prescription_from_api(prescription_id):
+    """Allow doctors to review prescription requests from the React frontend."""
+    if not current_user.has_role("Doctor"):
+        return json_error("Doctor access required.", 403)
+
+    if current_user.staff_profile is None:
+        return json_error("Staff profile was not found.", 404)
+
+    prescription = Prescription.query.get_or_404(prescription_id)
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get("status") or "").strip()
+
+    allowed_statuses = {"Requested", "Under Review", "Approved", "Rejected"}
+    if new_status not in allowed_statuses:
+        return json_error("Invalid prescription status for doctor review.", 400)
+
+    prescription.status = new_status
+    prescription.reviewed_at = datetime.utcnow()
+    prescription.reviewed_by_staff_profile_id = current_user.staff_profile.id
+
+    if new_status == "Approved":
+        prescription.payment_status = "Pending"
+        prescription.amount_due = PRESCRIPTION_STANDARD_FEE
+    elif new_status in {"Requested", "Under Review", "Rejected"}:
+        prescription.payment_status = "Not Required"
+        prescription.amount_due = 0.0
+
+    notify_user(
+        prescription.patient_profile.user_id,
+        "Prescription updated",
+        f"Your prescription request for {prescription.medicine_name} is now: {prescription.status}.",
     )
-    return jsonify({"ok": True, "prescriptions": [prescription_json(item) for item in prescriptions]})
+    log_action(
+        "Prescription reviewed",
+        "Prescription",
+        prescription.id,
+        f"Status set to {prescription.status}",
+    )
+    db.session.commit()
+
+    return jsonify({"ok": True, "prescription": prescription_json(prescription)})
 
 
 @api_bp.post("/prescriptions/<int:prescription_id>/pay")
@@ -829,7 +887,7 @@ def pay_prescription_from_api(prescription_id):
     prescription.paid_at = datetime.utcnow()
 
     notify_user(
-        current_user,
+        current_user.id,
         "Prescription payment received",
         f"Payment has been received for {prescription.medicine_name}. Reference: {prescription.payment_reference}.",
     )

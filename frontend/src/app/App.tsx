@@ -16,6 +16,7 @@ import { DoctorDashboard } from './components/doctor/DoctorDashboard';
 import { NurseDashboard } from './components/nurse/NurseDashboard';
 import { Availability } from './components/doctor/Availability';
 import { DoctorSchedule } from './components/doctor/DoctorSchedule';
+import { PrescriptionReview } from './components/doctor/PrescriptionReview';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -162,6 +163,8 @@ function AppRouter() {
     content = <DoctorSchedule staffName={currentUser.name} />;
   } else if (currentPage === 'doctor-availability' || currentPage === 'nurse-availability') {
     content = <Availability />;
+  } else if (currentPage === 'doctor-prescriptions') {
+    content = <PrescriptionReview />;
   }
 
   return (
