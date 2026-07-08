@@ -10,6 +10,8 @@ import { PatientProfile } from './components/patient/PatientProfile';
 import { BookAppointment } from './components/patient/BookAppointment';
 import { AppointmentHistory } from './components/patient/AppointmentHistory';
 import { PrescriptionRequest } from './components/patient/PrescriptionRequest';
+import { PrescriptionHistory } from './components/patient/PrescriptionHistory';
+import { PrescriptionPayment } from './components/patient/PrescriptionPayment';
 import { DoctorDashboard } from './components/doctor/DoctorDashboard';
 import { NurseDashboard } from './components/nurse/NurseDashboard';
 import { Availability } from './components/doctor/Availability';
@@ -148,6 +150,10 @@ function AppRouter() {
     content = <AppointmentHistory />;
   } else if (currentPage === 'prescription-request') {
     content = <PrescriptionRequest />;
+  } else if (currentPage === 'prescription-history') {
+    content = <PrescriptionHistory />;
+  } else if (currentPage === 'prescription-payment') {
+    content = <PrescriptionPayment />;
   } else if (currentPage === 'doctor-dashboard') {
     content = <DoctorDashboard />;
   } else if (currentPage === 'nurse-dashboard') {

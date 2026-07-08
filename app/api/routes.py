@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+from uuid import uuid4
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
@@ -6,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
 from app.models import AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
-from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, update_appointment_status
+from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, notify_user, update_appointment_status
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 csrf.exempt(api_bp)
@@ -779,6 +780,68 @@ def book_available_appointment():
         return json_error(str(exc), 400)
 
     return jsonify({"ok": True, "appointment": appointment_json(appointment)})
+
+
+@api_bp.get("/prescriptions")
+@login_required
+def list_prescriptions_from_api():
+    """Return prescriptions for the logged-in patient."""
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    profile = current_user.patient_profile
+    if profile is None:
+        return json_error("Patient profile was not found.", 404)
+
+    prescriptions = (
+        Prescription.query.filter_by(patient_profile_id=profile.id)
+        .order_by(Prescription.created_at.desc())
+        .all()
+    )
+    return jsonify({"ok": True, "prescriptions": [prescription_json(item) for item in prescriptions]})
+
+
+@api_bp.post("/prescriptions/<int:prescription_id>/pay")
+@login_required
+def pay_prescription_from_api(prescription_id):
+    """Record a simulated patient payment for an approved prescription."""
+    if not current_user.has_role("Patient"):
+        return json_error("Patient access required.", 403)
+
+    profile = current_user.patient_profile
+    if profile is None:
+        return json_error("Patient profile was not found.", 404)
+
+    prescription = Prescription.query.get_or_404(prescription_id)
+    if prescription.patient_profile_id != profile.id:
+        return json_error("You can only pay for your own prescription requests.", 403)
+
+    if prescription.payment_status == "Paid":
+        return jsonify({"ok": True, "prescription": prescription_json(prescription)})
+
+    if prescription.payment_status != "Pending" or not prescription.amount_due:
+        return json_error("There is no payment due for this prescription.", 400)
+
+    data = request.get_json(silent=True) or {}
+    prescription.payment_status = "Paid"
+    prescription.payment_method = (data.get("method") or "card").strip() or "card"
+    prescription.payment_reference = f"MQPAY-{uuid4().hex[:10].upper()}"
+    prescription.paid_at = datetime.utcnow()
+
+    notify_user(
+        current_user,
+        "Prescription payment received",
+        f"Payment has been received for {prescription.medicine_name}. Reference: {prescription.payment_reference}.",
+    )
+    log_action(
+        "Prescription payment completed",
+        "Prescription",
+        prescription.id,
+        f"Payment reference: {prescription.payment_reference}",
+    )
+    db.session.commit()
+
+    return jsonify({"ok": True, "prescription": prescription_json(prescription)})
 
 @api_bp.post("/prescriptions/request")
 @login_required
