@@ -941,3 +941,33 @@ def request_prescription_from_api():
 
     return jsonify({"ok": True, "prescription": prescription_json(prescription)}), 201
 
+
+
+
+@api_bp.get("/notifications")
+@login_required
+def notifications():
+    """Return notifications for the logged-in user."""
+    items = (
+        Notification.query.filter_by(user_id=current_user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return jsonify({"ok": True, "notifications": [notification_json(item) for item in items]})
+
+
+@api_bp.post("/notifications/<int:notification_id>/read")
+@login_required
+def mark_notification_read(notification_id):
+    """Mark a notification as read for the logged-in user."""
+    item = Notification.query.filter_by(id=notification_id, user_id=current_user.id).first_or_404()
+    item.is_read = True
+    db.session.commit()
+    return jsonify(
+        {
+            "ok": True,
+            "notification": notification_json(item),
+            "unreadCount": unread_notification_count(current_user.id),
+        }
+    )
