@@ -18,6 +18,7 @@ import { Availability } from './components/doctor/Availability';
 import { DoctorSchedule } from './components/doctor/DoctorSchedule';
 import { PrescriptionReview } from './components/doctor/PrescriptionReview';
 import { Notifications } from './components/Notifications';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -166,6 +167,8 @@ function AppRouter() {
     content = <Availability />;
   } else if (currentPage === 'doctor-prescriptions') {
     content = <PrescriptionReview />;
+  } else if (currentPage === 'admin-dashboard') {
+    content = <AdminDashboard />;
   } else if (currentPage === 'notifications') {
     content = <Notifications />;
   }

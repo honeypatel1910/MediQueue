@@ -6,7 +6,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
-from app.models import AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
+from app.models import AuditLog, AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
 from app.prescriptions.routes import PRESCRIPTION_STANDARD_FEE
 from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, notify_user, update_appointment_status
 
@@ -969,5 +969,77 @@ def mark_notification_read(notification_id):
             "ok": True,
             "notification": notification_json(item),
             "unreadCount": unread_notification_count(current_user.id),
+        }
+    )
+
+
+
+@api_bp.get("/admin/dashboard")
+@login_required
+def admin_dashboard_from_api():
+    """Return practice overview data for the React admin dashboard."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    today_start = datetime.combine(date.today(), time.min)
+    today_end = datetime.combine(date.today(), time.max)
+
+    total_users = User.query.count()
+    active_users = User.query.filter_by(active=True).count()
+    patient_count = User.query.join(Role).filter(Role.name == "Patient").count()
+    doctor_count = User.query.join(Role).filter(Role.name == "Doctor").count()
+    nurse_count = User.query.join(Role).filter(Role.name == "Nurse").count()
+
+    today_appointments = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(AppointmentSlot.start_at >= today_start, AppointmentSlot.start_at <= today_end)
+        .count()
+    )
+    upcoming_appointments = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(AppointmentSlot.start_at > datetime.now(), Appointment.status == "Booked")
+        .count()
+    )
+    pending_prescriptions = Prescription.query.filter(Prescription.status.in_(["Requested", "Under Review"])).count()
+    approved_prescriptions = Prescription.query.filter_by(status="Approved").count()
+    paid_prescriptions = Prescription.query.filter_by(payment_status="Paid").count()
+
+    recent_appointments = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .order_by(AppointmentSlot.start_at.desc())
+        .limit(6)
+        .all()
+    )
+    recent_prescriptions = Prescription.query.order_by(Prescription.created_at.desc()).limit(6).all()
+    recent_audit_logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(8).all()
+
+    return jsonify(
+        {
+            "ok": True,
+            "summary": {
+                "totalUsers": total_users,
+                "activeUsers": active_users,
+                "patients": patient_count,
+                "doctors": doctor_count,
+                "nurses": nurse_count,
+                "todayAppointments": today_appointments,
+                "upcomingAppointments": upcoming_appointments,
+                "pendingPrescriptions": pending_prescriptions,
+                "approvedPrescriptions": approved_prescriptions,
+                "paidPrescriptions": paid_prescriptions,
+            },
+            "recentAppointments": [appointment_json(item) for item in recent_appointments],
+            "recentPrescriptions": [prescription_json(item) for item in recent_prescriptions],
+            "recentAuditLogs": [
+                {
+                    "id": str(item.id),
+                    "action": item.action,
+                    "entityType": item.entity_type or "System",
+                    "details": item.details or "",
+                    "createdAt": item.created_at.isoformat() if item.created_at else "",
+                    "userName": item.user.full_name if item.user else "System",
+                }
+                for item in recent_audit_logs
+            ],
         }
     )
