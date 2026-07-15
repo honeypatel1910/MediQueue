@@ -6,7 +6,19 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db
-from app.models import AuditLog, AvailabilityBlock, Appointment, AppointmentSlot, Notification, PatientProfile, Prescription, Role, User
+from app.models import (
+    AuditLog,
+    AvailabilityBlock,
+    Appointment,
+    AppointmentSlot,
+    Notification,
+    PatientProfile,
+    Prescription,
+    ProfessionalRegister,
+    Role,
+    StaffProfile,
+    User,
+)
 from app.prescriptions.routes import PRESCRIPTION_STANDARD_FEE
 from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, notify_user, update_appointment_status
 
@@ -54,6 +66,38 @@ def user_json(user):
     if user.patient_profile:
         payload["patientReference"] = user.patient_profile.patient_reference
 
+    return payload
+
+
+def staff_json(staff):
+    """Return staff profile data for admin user management."""
+    register = staff.professional_register
+    role_name = staff.user.role.name if staff.user and staff.user.role else staff.job_title
+    return {
+        "id": str(staff.id),
+        "name": staff.user.full_name if staff.user else "Clinical staff",
+        "role": role_name if role_name in {"Doctor", "Nurse"} else staff.job_title,
+        "specialisation": staff.department or staff.job_title or "General Practice",
+        "email": staff.user.email if staff.user else "",
+        "status": "Verified" if register and register.verified else "Pending",
+        "licenceNumber": f"{register.register_name}-{register.registration_number}" if register else "",
+        "userId": str(staff.user_id),
+    }
+
+
+def public_user_json(user):
+    """Return a safe user record for the admin management table."""
+    payload = {
+        "id": str(user.id),
+        "name": user.full_name,
+        "email": user.email,
+        "role": role_to_frontend(user.role.name if user.role else "Patient"),
+        "status": "Active" if user.active else "Inactive",
+        "registered": user.created_at.date().isoformat() if user.created_at else "",
+    }
+    if user.staff_profile:
+        payload.update(staff_json(user.staff_profile))
+        payload["userId"] = str(user.id)
     return payload
 
 
@@ -1043,3 +1087,121 @@ def admin_dashboard_from_api():
             ],
         }
     )
+
+@api_bp.get("/admin/users")
+@login_required
+def admin_users_from_api():
+    """Return users grouped for the React admin user-management page."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    users = User.query.order_by(User.created_at.desc()).all()
+    staff_profiles = StaffProfile.query.join(User).order_by(User.created_at.desc()).all()
+
+    return jsonify(
+        {
+            "ok": True,
+            "users": [public_user_json(user) for user in users],
+            "patients": [public_user_json(user) for user in users if user.has_role("Patient")],
+            "staff": [staff_json(staff) for staff in staff_profiles],
+        }
+    )
+
+
+@api_bp.post("/admin/users/create")
+@login_required
+def admin_create_user_from_api():
+    """Create a user account from the React admin page."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    data = request.get_json(silent=True) or {}
+    full_name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").lower().strip()
+    password = data.get("password") or ""
+    role_key = (data.get("role") or "patient").strip().lower()
+
+    if not full_name or not email or not password:
+        return json_error("Name, email and password are required.", 400)
+    if len(password) < 8:
+        return json_error("Password must be at least 8 characters long.", 400)
+    if User.query.filter_by(email=email).first():
+        return json_error("A user with this email already exists.", 409)
+
+    role_name = {
+        "patient": "Patient",
+        "doctor": "Doctor",
+        "nurse": "Nurse",
+        "admin": "Practice Admin",
+    }.get(role_key, "Patient")
+
+    role = Role.query.filter_by(name=role_name).first()
+    if role is None:
+        role = Role(name=role_name)
+        db.session.add(role)
+        db.session.flush()
+
+    name_parts = full_name.split()
+    first_name = name_parts[0]
+    last_name = " ".join(name_parts[1:]) or role_name
+
+    user = User(
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        role=role,
+        active=True,
+    )
+    user.set_password(password)
+    db.session.add(user)
+    db.session.flush()
+
+    if role_name == "Patient":
+        db.session.add(PatientProfile(user=user, patient_reference=f"MQP-{user.id:05d}"))
+    elif role_name in {"Doctor", "Nurse"}:
+        department = (data.get("specialisation") or "").strip() or ("General Practice" if role_name == "Doctor" else "Practice Nursing")
+        staff = StaffProfile(
+            user=user,
+            job_title=role_name,
+            department=department,
+            phone_extension="",
+        )
+        db.session.add(staff)
+        db.session.flush()
+
+        licence = (data.get("licenceNumber") or "").strip()
+        if licence:
+            register_name = "GMC" if role_name == "Doctor" else "NMC"
+            cleaned_number = licence.replace("GMC-", "").replace("NMC-", "").strip()
+            db.session.add(
+                ProfessionalRegister(
+                    staff_profile=staff,
+                    register_name=register_name,
+                    registration_number=cleaned_number,
+                    verified=True,
+                )
+            )
+
+    log_action("User account created", "User", user.id, f"Role: {role_name}")
+    db.session.commit()
+
+    return jsonify({"ok": True, "user": public_user_json(user)}), 201
+
+
+@api_bp.post("/admin/users/<int:user_id>/toggle")
+@login_required
+def admin_toggle_user_from_api(user_id):
+    """Activate or deactivate a user from the React admin page."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        return json_error("You cannot deactivate your own account.", 400)
+
+    user.active = not user.active
+    log_action("User status updated", "User", user.id, f"Active: {user.active}")
+    db.session.commit()
+
+    return jsonify({"ok": True, "user": public_user_json(user)})
+
