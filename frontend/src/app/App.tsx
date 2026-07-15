@@ -20,6 +20,8 @@ import { PrescriptionReview } from './components/doctor/PrescriptionReview';
 import { Notifications } from './components/Notifications';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { UserManagement } from './components/admin/UserManagement';
+import { AppointmentManagement } from './components/admin/AppointmentManagement';
+import { PrescriptionManagement } from './components/admin/PrescriptionManagement';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -172,6 +174,10 @@ function AppRouter() {
     content = <AdminDashboard />;
   } else if (currentPage === 'admin-users') {
     content = <UserManagement />;
+  } else if (currentPage === 'admin-appointments') {
+    content = <AppointmentManagement />;
+  } else if (currentPage === 'admin-prescriptions') {
+    content = <PrescriptionManagement />;
   } else if (currentPage === 'notifications') {
     content = <Notifications />;
   }

@@ -1205,3 +1205,71 @@ def admin_toggle_user_from_api(user_id):
 
     return jsonify({"ok": True, "user": public_user_json(user)})
 
+
+
+
+@api_bp.get("/admin/appointments")
+@login_required
+def admin_appointments_from_api():
+    """Return all appointments for the React admin appointment-management page."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    query = Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+
+    status_filter = (request.args.get("status") or "").strip()
+    if status_filter and status_filter != "All":
+        query = query.filter(Appointment.status == status_filter)
+
+    appointments = query.order_by(AppointmentSlot.start_at.desc()).limit(250).all()
+    return jsonify({"ok": True, "appointments": [appointment_json(item) for item in appointments]})
+
+
+@api_bp.get("/admin/prescriptions")
+@login_required
+def admin_prescriptions_from_api():
+    """Return all prescriptions for the React admin prescription-management page."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    prescriptions = Prescription.query.order_by(Prescription.created_at.desc()).limit(250).all()
+    return jsonify({"ok": True, "prescriptions": [prescription_json(item) for item in prescriptions]})
+
+
+@api_bp.post("/admin/prescriptions/<int:prescription_id>/status")
+@login_required
+def admin_update_prescription_status_from_api(prescription_id):
+    """Allow practice admin to manage collection states from the React UI."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    prescription = Prescription.query.get_or_404(prescription_id)
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get("status") or "").strip()
+
+    if new_status not in {"Ready for Collection", "Collected"}:
+        return json_error("Invalid prescription collection status.", 400)
+
+    if new_status == "Ready for Collection":
+        if prescription.status != "Approved" or prescription.payment_status != "Paid":
+            return json_error("Only approved and paid prescriptions can be marked ready for collection.", 400)
+    elif new_status == "Collected":
+        if prescription.status != "Ready for Collection":
+            return json_error("Only prescriptions ready for collection can be marked as collected.", 400)
+
+    prescription.status = new_status
+
+    notify_user(
+        prescription.patient_profile.user_id,
+        "Prescription status updated",
+        f"Your prescription request for {prescription.medicine_name} is now: {prescription.status}.",
+    )
+    log_action(
+        "Prescription collection status updated",
+        "Prescription",
+        prescription.id,
+        f"Status set to {prescription.status}",
+    )
+    db.session.commit()
+
+    return jsonify({"ok": True, "prescription": prescription_json(prescription)})
