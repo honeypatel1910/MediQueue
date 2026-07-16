@@ -221,6 +221,21 @@ def notification_json(notification):
     }
 
 
+def audit_json(log):
+    """Return audit-log data in the format used by the React admin UI."""
+    user = log.user
+    role_name = user.role.name if user and user.role else "System"
+    return {
+        "id": str(log.id),
+        "action": log.action,
+        "user": user.full_name if user else "System",
+        "role": role_name,
+        "datetime": log.created_at.isoformat() if log.created_at else "",
+        "entity": f"{log.entity_type or 'Record'} #{log.entity_id or ''}".strip(),
+        "description": log.details or "",
+    }
+
+
 def json_error(message, status=400):
     return jsonify({"ok": False, "error": message}), status
 
@@ -1273,3 +1288,41 @@ def admin_update_prescription_status_from_api(prescription_id):
     db.session.commit()
 
     return jsonify({"ok": True, "prescription": prescription_json(prescription)})
+
+@api_bp.get("/audit-logs")
+@login_required
+def audit_logs_from_api():
+    """Return audit logs for the React admin audit-log page."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    items = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(300).all()
+    return jsonify({"ok": True, "auditLogs": [audit_json(item) for item in items]})
+
+
+@api_bp.get("/reports/summary")
+@login_required
+def reports_summary_from_api():
+    """Return reporting summary data for the React admin reports page."""
+    if not current_user.has_role("Practice Admin"):
+        return json_error("Practice admin access required.", 403)
+
+    total_appointments = Appointment.query.count()
+    completed_appointments = Appointment.query.filter_by(status="Completed").count()
+    cancelled_appointments = Appointment.query.filter_by(status="Cancelled").count()
+    total_prescriptions = Prescription.query.count()
+    paid_prescriptions = Prescription.query.filter_by(payment_status="Paid").count()
+
+    return jsonify(
+        {
+            "ok": True,
+            "summary": {
+                "appointments": total_appointments,
+                "completedAppointments": completed_appointments,
+                "cancelledAppointments": cancelled_appointments,
+                "prescriptions": total_prescriptions,
+                "paidPrescriptions": paid_prescriptions,
+            },
+        }
+    )
+

@@ -22,6 +22,8 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { UserManagement } from './components/admin/UserManagement';
 import { AppointmentManagement } from './components/admin/AppointmentManagement';
 import { PrescriptionManagement } from './components/admin/PrescriptionManagement';
+import { Reports } from './components/admin/Reports';
+import { AuditLogs } from './components/admin/AuditLogs';
 import type { Page } from './types';
 
 const PAGE_TITLES: Record<Page, string> = {
@@ -178,6 +180,10 @@ function AppRouter() {
     content = <AppointmentManagement />;
   } else if (currentPage === 'admin-prescriptions') {
     content = <PrescriptionManagement />;
+  } else if (currentPage === 'admin-reports') {
+    content = <Reports />;
+  } else if (currentPage === 'admin-audit') {
+    content = <AuditLogs />;
   } else if (currentPage === 'notifications') {
     content = <Notifications />;
   }
