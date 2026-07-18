@@ -1,4 +1,6 @@
-from flask import Flask, render_template
+from pathlib import Path
+
+from flask import Flask, render_template, send_from_directory
 
 from app.config import Config
 from app.extensions import csrf, db, login_manager, migrate
@@ -50,8 +52,26 @@ def create_app(config_class=Config):
     app.register_blueprint(reports_bp)
     app.register_blueprint(api_bp)
 
+    react_dist = Path(app.root_path).parent / "frontend" / "dist"
+
+    @app.route("/assets/<path:filename>")
+    def react_assets(filename):
+        """Serve compiled React assets when the frontend has been built."""
+        return send_from_directory(react_dist / "assets", filename)
+
     @app.route("/")
     def index():
+        """Serve the React frontend if built; otherwise use the Flask landing page."""
+        if (react_dist / "index.html").exists():
+            return send_from_directory(react_dist, "index.html")
+        return render_template("index.html")
+
+    @app.route("/app")
+    @app.route("/app/<path:_path>")
+    def react_app(_path=None):
+        """Serve the React single-page app for production frontend routes."""
+        if (react_dist / "index.html").exists():
+            return send_from_directory(react_dist, "index.html")
         return render_template("index.html")
 
     @app.route("/health")

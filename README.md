@@ -86,3 +86,36 @@ Initial JSON API endpoints are available for the React frontend:
 ```
 
 These endpoints use the same Flask-Login session as the server-rendered pages.
+
+## React production build through Flask
+
+After the React frontend is built, Flask serves the compiled frontend from:
+
+```text
+frontend/dist
+```
+
+Use this when testing the integrated application from one address:
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+python run.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5000
+```
+
+During development, you can still run React separately with:
+
+```bash
+cd frontend
+npm run dev
+```
+
+The Vite development server proxies `/api` and `/reports` requests to the Flask backend.
