@@ -20,7 +20,7 @@ from app.models import (
     User,
 )
 from app.prescriptions.routes import PRESCRIPTION_STANDARD_FEE
-from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, notify_user, update_appointment_status
+from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, notify_user, update_appointment_status, validate_staff_availability_window
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 csrf.exempt(api_bp)
@@ -593,6 +593,12 @@ def create_staff_availability():
     data = request.get_json(silent=True) or {}
     try:
         available_date, start_time_value, end_time_value, slot_duration, location = parse_availability_payload(data)
+        validate_staff_availability_window(
+            staff.id,
+            available_date,
+            start_time_value,
+            end_time_value,
+        )
     except ValueError as exc:
         return json_error(str(exc), 400)
 
@@ -638,6 +644,13 @@ def update_staff_availability(block_id):
     data = request.get_json(silent=True) or {}
     try:
         available_date, start_time_value, end_time_value, slot_duration, location = parse_availability_payload(data)
+        validate_staff_availability_window(
+            staff.id,
+            available_date,
+            start_time_value,
+            end_time_value,
+            exclude_block_id=block.id,
+        )
     except ValueError as exc:
         return json_error(str(exc), 400)
 

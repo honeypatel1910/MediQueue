@@ -4,7 +4,7 @@ from flask import request
 from flask_login import current_user
 
 from app.extensions import db
-from app.models import Appointment, AppointmentSlot, AuditLog, Notification
+from app.models import Appointment, AppointmentSlot, AuditLog, AvailabilityBlock, Notification
 
 
 ACTIVE_APPOINTMENT_STATUSES = {"Booked"}
@@ -42,6 +42,69 @@ def log_action(action, entity_type=None, entity_id=None, details=None, user_id=N
     )
     db.session.add(log)
     return log
+
+
+def find_overlapping_availability(staff_profile_id, available_date, start_time, end_time, exclude_block_id=None):
+    """Return an existing availability block that overlaps the proposed time window."""
+    query = AvailabilityBlock.query.filter(
+        AvailabilityBlock.staff_profile_id == staff_profile_id,
+        AvailabilityBlock.available_date == available_date,
+        AvailabilityBlock.start_time < end_time,
+        AvailabilityBlock.end_time > start_time,
+    )
+
+    if exclude_block_id is not None:
+        query = query.filter(AvailabilityBlock.id != exclude_block_id)
+
+    return query.order_by(AvailabilityBlock.start_time.asc()).first()
+
+
+def active_appointment_overlaps_availability(staff_profile_id, available_date, start_time, end_time, exclude_block_id=None):
+    """Return True when an active booked appointment overlaps a proposed availability window."""
+    window_start = datetime.combine(available_date, start_time)
+    window_end = datetime.combine(available_date, end_time)
+
+    query = (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .join(AvailabilityBlock, AppointmentSlot.availability_block_id == AvailabilityBlock.id)
+        .filter(Appointment.staff_profile_id == staff_profile_id)
+        .filter(Appointment.status.in_(ACTIVE_APPOINTMENT_STATUSES))
+        .filter(AppointmentSlot.start_at < window_end)
+        .filter(AppointmentSlot.end_at > window_start)
+    )
+
+    if exclude_block_id is not None:
+        query = query.filter(AppointmentSlot.availability_block_id != exclude_block_id)
+
+    return query.first() is not None
+
+
+def validate_staff_availability_window(staff_profile_id, available_date, start_time, end_time, exclude_block_id=None):
+    """Ensure a staff member does not publish overlapping availability."""
+    overlapping_block = find_overlapping_availability(
+        staff_profile_id,
+        available_date,
+        start_time,
+        end_time,
+        exclude_block_id=exclude_block_id,
+    )
+    if overlapping_block is not None:
+        raise ValueError(
+            "This availability overlaps with an existing schedule for the same staff member. "
+            "Please choose a different date or time range."
+        )
+
+    if active_appointment_overlaps_availability(
+        staff_profile_id,
+        available_date,
+        start_time,
+        end_time,
+        exclude_block_id=exclude_block_id,
+    ):
+        raise ValueError(
+            "This time range already contains a booked appointment. "
+            "Please choose a different date or time range."
+        )
 
 
 def generate_slots_for_availability(availability_block):

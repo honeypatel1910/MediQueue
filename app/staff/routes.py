@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from app.decorators import role_required
 from app.extensions import db
 from app.models import Appointment, AppointmentSlot, AvailabilityBlock, Prescription, ProfessionalRegister, StaffProfile
-from app.services import generate_slots_for_availability, log_action, update_appointment_status
+from app.services import generate_slots_for_availability, log_action, update_appointment_status, validate_staff_availability_window
 from app.staff import staff_bp
 from app.staff.forms import AppointmentStatusForm, AvailabilityForm, StaffProfileForm
 
@@ -98,6 +98,17 @@ def availability():
     form = AvailabilityForm()
 
     if form.validate_on_submit():
+        try:
+            validate_staff_availability_window(
+                profile.id,
+                form.available_date.data,
+                form.start_time.data,
+                form.end_time.data,
+            )
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("staff.availability"))
+
         block = AvailabilityBlock(
             staff_profile=profile,
             available_date=form.available_date.data,
@@ -151,6 +162,18 @@ def edit_availability(block_id):
     form.submit.label.text = "Update Availability"
 
     if form.validate_on_submit():
+        try:
+            validate_staff_availability_window(
+                profile.id,
+                form.available_date.data,
+                form.start_time.data,
+                form.end_time.data,
+                exclude_block_id=block.id,
+            )
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("staff.edit_availability", block_id=block.id))
+
         block.available_date = form.available_date.data
         block.start_time = form.start_time.data
         block.end_time = form.end_time.data
