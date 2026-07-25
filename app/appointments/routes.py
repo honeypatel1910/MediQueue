@@ -65,9 +65,12 @@ def book(slot_id):
     reason = request.form.get("reason", "").strip()
 
     try:
-        book_appointment(current_user.patient_profile, slot_id, reason=reason)
+        appointment = book_appointment(current_user.patient_profile, slot_id, reason=reason)
         db.session.commit()
-        flash("Appointment booked successfully.", "success")
+        if appointment.status == "Pending Approval":
+            flash("You already have 3 upcoming appointments with this clinician. Your extra appointment request has been sent for approval.", "warning")
+        else:
+            flash("Appointment booked successfully.", "success")
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), "danger")

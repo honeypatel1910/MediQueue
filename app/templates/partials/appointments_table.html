@@ -24,26 +24,41 @@
                     <td>
                         {% if appointment.status == 'Booked' %}
                             <span class="badge text-bg-primary">Booked</span>
+                        {% elif appointment.status == 'Pending Approval' %}
+                            <span class="badge text-bg-warning">Pending Approval</span>
                         {% elif appointment.status == 'Completed' %}
                             <span class="badge text-bg-success">Completed</span>
                         {% elif appointment.status == 'Cancelled' %}
                             <span class="badge text-bg-secondary">Cancelled</span>
                         {% elif appointment.status == 'Missed' %}
                             <span class="badge text-bg-warning">Missed</span>
+                        {% elif appointment.status == 'Rejected' %}
+                            <span class="badge text-bg-danger">Rejected</span>
                         {% else %}
                             <span class="badge text-bg-light">{{ appointment.status }}</span>
                         {% endif %}
                     </td>
                     <td class="text-end">
                         <div class="d-flex justify-content-end gap-2 flex-wrap">
-                            {% if appointment.status == 'Booked' %}
+                            {% if appointment.status in ['Booked', 'Pending Approval'] %}
                                 <form method="post" action="{{ url_for('appointments.cancel', appointment_id=appointment.id) }}" class="d-inline">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
                                 </form>
                             {% endif %}
                             {% if current_user.has_role('Doctor', 'Nurse') and appointment.staff_profile.user_id == current_user.id %}
-                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('staff.update_appointment', appointment_id=appointment.id) }}">Update</a>
+                                {% if appointment.status == 'Pending Approval' %}
+                                    <form method="post" action="{{ url_for('staff.approve_extra_request', appointment_id=appointment.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="btn btn-sm btn-success" type="submit">Approve</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('staff.reject_extra_request', appointment_id=appointment.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="btn btn-sm btn-outline-warning" type="submit">Reject</button>
+                                    </form>
+                                {% else %}
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('staff.update_appointment', appointment_id=appointment.id) }}">Update</a>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </td>

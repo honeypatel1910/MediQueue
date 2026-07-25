@@ -43,7 +43,7 @@ export function AppointmentHistory() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by doctor or reason" className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 placeholder:text-slate-400" />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as AppointmentStatus | 'All')} className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-slate-700">
-          {['All', 'Booked', 'Completed', 'Cancelled', 'Missed'].map(s => <option key={s} value={s}>{s}</option>)}
+          {['All', 'Booked', 'Pending Approval', 'Completed', 'Cancelled', 'Missed', 'Rejected'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
@@ -68,7 +68,7 @@ export function AppointmentHistory() {
                 </div>
                 <div className="flex flex-col items-start sm:items-end gap-2">
                   <StatusBadge status={a.status} />
-                  {a.status === 'Booked' && new Date(a.date) >= new Date(new Date().toDateString()) && <button onClick={() => setCancelId(a.id)} className="text-sm text-red-600 hover:text-red-700 font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors">Cancel</button>}
+                  {['Booked', 'Pending Approval'].includes(a.status) && new Date(a.date) >= new Date(new Date().toDateString()) && <button onClick={() => setCancelId(a.id)} className="text-sm text-red-600 hover:text-red-700 font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors">Cancel</button>}
                 </div>
               </div>
             </div>

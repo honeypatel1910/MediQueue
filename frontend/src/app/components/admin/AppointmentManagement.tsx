@@ -70,9 +70,11 @@ export function AppointmentManagement() {
         >
           <option>All</option>
           <option>Booked</option>
+          <option>Pending Approval</option>
           <option>Completed</option>
           <option>Cancelled</option>
           <option>Missed</option>
+          <option>Rejected</option>
         </select>
       </div>
 
@@ -114,9 +116,11 @@ export function AppointmentManagement() {
                       className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-slate-600"
                     >
                       <option>Booked</option>
+                      <option>Pending Approval</option>
                       <option>Completed</option>
                       <option>Cancelled</option>
                       <option>Missed</option>
+                      <option>Rejected</option>
                     </select>
                   </td>
                 </tr>

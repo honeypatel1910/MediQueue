@@ -17,6 +17,7 @@ interface AvailableAppointmentsResponse {
 interface BookAppointmentResponse {
   ok: boolean;
   appointment: Appointment;
+  message?: string;
 }
 
 function tomorrowDate() {
@@ -84,9 +85,14 @@ export function BookAppointment() {
         body: JSON.stringify({ slotId: selectedSlotId, reason }),
       });
 
-      setMessage(
-        `Appointment booked with ${data.appointment.doctorName} on ${new Date(data.appointment.date).toLocaleDateString('en-GB')} at ${data.appointment.time}.`,
-      );
+      if (data.appointment.status === 'Pending Approval') {
+        setMessage(data.message || `Extra appointment request sent to ${data.appointment.doctorName} for approval.`);
+      } else {
+        setMessage(
+          data.message ||
+            `Appointment booked with ${data.appointment.doctorName} on ${new Date(data.appointment.date).toLocaleDateString('en-GB')} at ${data.appointment.time}.`,
+        );
+      }
       setReason('');
       await loadSlots();
     } catch (err) {
@@ -164,7 +170,7 @@ export function BookAppointment() {
       )}
 
       {message && (
-        <div className="flex items-start gap-3 rounded-2xl border border-green-100 bg-green-50 p-4 text-sm text-green-700">
+        <div className={`flex items-start gap-3 rounded-2xl border p-4 text-sm ${message.toLowerCase().includes('approval') ? 'border-amber-100 bg-amber-50 text-amber-700' : 'border-green-100 bg-green-50 text-green-700'}`}>
           <CheckCircle2 size={18} className="mt-0.5" />
           <span>{message}</span>
         </div>

@@ -20,7 +20,18 @@ from app.models import (
     User,
 )
 from app.prescriptions.routes import PRESCRIPTION_STANDARD_FEE
-from app.services import book_appointment, cancel_appointment, generate_slots_for_availability, log_action, notify_user, update_appointment_status, validate_staff_availability_window
+from app.services import (
+    PENDING_APPROVAL_STATUS,
+    approve_extra_appointment,
+    book_appointment,
+    cancel_appointment,
+    generate_slots_for_availability,
+    log_action,
+    notify_user,
+    reject_extra_appointment,
+    update_appointment_status,
+    validate_staff_availability_window,
+)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 csrf.exempt(api_bp)
@@ -779,6 +790,60 @@ def update_staff_appointment_status(appointment_id):
 
     return jsonify({"ok": True, "appointment": appointment_json(appointment)})
 
+
+@api_bp.post("/staff/appointments/<int:appointment_id>/approve-extra")
+@login_required
+def approve_extra_appointment_from_api(appointment_id):
+    """Allow a doctor or nurse to approve a pending extra appointment request."""
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    appointment = Appointment.query.get_or_404(appointment_id)
+    if appointment.staff_profile_id != staff.id:
+        return json_error("You can only approve requests assigned to you.", 403)
+
+    try:
+        approve_extra_appointment(appointment)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return json_error(str(exc), 400)
+
+    return jsonify({"ok": True, "appointment": appointment_json(appointment)})
+
+
+@api_bp.post("/staff/appointments/<int:appointment_id>/reject-extra")
+@login_required
+def reject_extra_appointment_from_api(appointment_id):
+    """Allow a doctor or nurse to reject a pending extra appointment request."""
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    appointment = Appointment.query.get_or_404(appointment_id)
+    if appointment.staff_profile_id != staff.id:
+        return json_error("You can only reject requests assigned to you.", 403)
+
+    data = request.get_json(silent=True) or {}
+    internal_note = (data.get("internalNote") or "").strip()
+
+    try:
+        reject_extra_appointment(appointment, internal_note=internal_note)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return json_error(str(exc), 400)
+
+    return jsonify({"ok": True, "appointment": appointment_json(appointment)})
+
+
 @api_bp.get("/appointments/available")
 @login_required
 def available_appointments():
@@ -852,7 +917,14 @@ def book_available_appointment():
         db.session.rollback()
         return json_error(str(exc), 400)
 
-    return jsonify({"ok": True, "appointment": appointment_json(appointment)})
+    message = "Appointment booked successfully."
+    if appointment.status == PENDING_APPROVAL_STATUS:
+        message = (
+            "You already have 3 active upcoming appointments with this clinician. "
+            "This extra appointment request has been sent for approval."
+        )
+
+    return jsonify({"ok": True, "appointment": appointment_json(appointment), "message": message})
 
 
 @api_bp.get("/prescriptions")

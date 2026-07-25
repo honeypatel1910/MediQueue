@@ -7,8 +7,11 @@ from app.extensions import db
 from app.models import Appointment, AppointmentSlot, AuditLog, AvailabilityBlock, Notification
 
 
-ACTIVE_APPOINTMENT_STATUSES = {"Booked"}
-FINAL_APPOINTMENT_STATUSES = {"Cancelled", "Completed", "Missed"}
+STANDARD_APPOINTMENT_LIMIT_PER_STAFF = 3
+PENDING_APPROVAL_STATUS = "Pending Approval"
+REJECTED_APPOINTMENT_STATUS = "Rejected"
+ACTIVE_APPOINTMENT_STATUSES = {"Booked", PENDING_APPROVAL_STATUS}
+FINAL_APPOINTMENT_STATUSES = {"Cancelled", "Completed", "Missed", REJECTED_APPOINTMENT_STATUS}
 
 
 def notify_user(user_id, title, message):
@@ -60,7 +63,7 @@ def find_overlapping_availability(staff_profile_id, available_date, start_time, 
 
 
 def active_appointment_overlaps_availability(staff_profile_id, available_date, start_time, end_time, exclude_block_id=None):
-    """Return True when an active booked appointment overlaps a proposed availability window."""
+    """Return True when an active booked or pending appointment overlaps a proposed availability window."""
     window_start = datetime.combine(available_date, start_time)
     window_end = datetime.combine(available_date, end_time)
 
@@ -102,7 +105,7 @@ def validate_staff_availability_window(staff_profile_id, available_date, start_t
         exclude_block_id=exclude_block_id,
     ):
         raise ValueError(
-            "This time range already contains a booked appointment. "
+            "This time range already contains a booked or pending approval appointment. "
             "Please choose a different date or time range."
         )
 
@@ -133,13 +136,33 @@ def generate_slots_for_availability(availability_block):
 
 
 def slot_has_active_booking(slot_id):
-    """Return True when the slot already has an active booked appointment."""
+    """Return True when the slot already has an active booked or pending appointment."""
     return (
         Appointment.query.filter(Appointment.appointment_slot_id == slot_id)
         .filter(Appointment.status.in_(ACTIVE_APPOINTMENT_STATUSES))
         .first()
         is not None
     )
+
+
+def count_active_upcoming_appointments_with_staff(patient_profile_id, staff_profile_id):
+    """Count a patient's active future appointments or approval requests with one staff member."""
+    return (
+        Appointment.query.join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(Appointment.patient_profile_id == patient_profile_id)
+        .filter(Appointment.staff_profile_id == staff_profile_id)
+        .filter(Appointment.status.in_(ACTIVE_APPOINTMENT_STATUSES))
+        .filter(AppointmentSlot.start_at > datetime.now())
+        .count()
+    )
+
+
+def patient_requires_extra_appointment_approval(patient_profile_id, staff_profile_id):
+    """Return True when a patient already has three active upcoming appointments with this staff member."""
+    return count_active_upcoming_appointments_with_staff(
+        patient_profile_id,
+        staff_profile_id,
+    ) >= STANDARD_APPOINTMENT_LIMIT_PER_STAFF
 
 
 def patient_has_overlapping_appointment(patient_profile_id, slot):
@@ -156,7 +179,12 @@ def patient_has_overlapping_appointment(patient_profile_id, slot):
 
 
 def book_appointment(patient_profile, slot_id, reason=""):
-    """Book an available slot while preventing duplicate bookings and patient overlaps."""
+    """Book an available slot or create an extra-appointment approval request.
+
+    A patient may keep up to three active future appointments with the same
+    doctor/nurse. The fourth request is not booked immediately; it is held as
+    Pending Approval so the staff member can approve or reject it.
+    """
     if patient_profile is None:
         raise ValueError("Patient profile was not found.")
 
@@ -169,61 +197,89 @@ def book_appointment(patient_profile, slot_id, reason=""):
 
     with db.session.no_autoflush:
         if slot.status != "Available" or slot_has_active_booking(slot.id):
-            slot.status = "Booked"
-            raise ValueError("This appointment slot is already booked.")
+            raise ValueError("This appointment slot is already booked or awaiting approval.")
 
         if patient_has_overlapping_appointment(patient_profile.id, slot):
-            raise ValueError("You already have an appointment at this time.")
+            raise ValueError("You already have an appointment or pending request at this time.")
+
+        needs_approval = patient_requires_extra_appointment_approval(
+            patient_profile.id,
+            slot.staff_profile.id,
+        )
+
+    appointment_status = PENDING_APPROVAL_STATUS if needs_approval else "Booked"
+    slot_status = PENDING_APPROVAL_STATUS if needs_approval else "Booked"
 
     appointment = Appointment(
         patient_profile_id=patient_profile.id,
         staff_profile_id=slot.staff_profile.id,
         appointment_slot_id=slot.id,
-        status="Booked",
+        status=appointment_status,
         reason=reason,
     )
-    slot.status = "Booked"
+    slot.status = slot_status
     db.session.add(appointment)
-    notify_user(
-        patient_profile.user_id,
-        "Appointment booked",
-        f"Your appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')} has been booked.",
-    )
-    notify_user(
-        slot.staff_profile.user_id,
-        "New appointment booked",
-        f"A patient booked an appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')}.",
-    )
     db.session.flush()
-    log_action(
-        "Appointment booked",
-        "Appointment",
-        appointment.id,
-        f"Slot {slot.start_at.strftime('%Y-%m-%d %H:%M')} with {slot.staff_profile.user.full_name}",
-    )
+
+    if needs_approval:
+        notify_user(
+            patient_profile.user_id,
+            "Extra appointment request sent",
+            f"Your request for {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')} was sent to {slot.staff_profile.user.full_name} for approval.",
+        )
+        notify_user(
+            slot.staff_profile.user_id,
+            "Extra appointment approval required",
+            f"{patient_profile.user.full_name} already has {STANDARD_APPOINTMENT_LIMIT_PER_STAFF} active appointments with you and requested an extra slot on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')}.",
+        )
+        log_action(
+            "Extra appointment requested",
+            "Appointment",
+            appointment.id,
+            f"Pending approval for slot {slot.start_at.strftime('%Y-%m-%d %H:%M')} with {slot.staff_profile.user.full_name}",
+        )
+    else:
+        notify_user(
+            patient_profile.user_id,
+            "Appointment booked",
+            f"Your appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')} has been booked.",
+        )
+        notify_user(
+            slot.staff_profile.user_id,
+            "New appointment booked",
+            f"A patient booked an appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')}.",
+        )
+        log_action(
+            "Appointment booked",
+            "Appointment",
+            appointment.id,
+            f"Slot {slot.start_at.strftime('%Y-%m-%d %H:%M')} with {slot.staff_profile.user.full_name}",
+        )
+
     db.session.flush()
     return appointment
 
 
 def cancel_appointment(appointment):
-    """Cancel a future booked appointment and release the slot for another patient."""
-    if appointment.status != "Booked":
-        raise ValueError("Only booked appointments can be cancelled.")
+    """Cancel a future booked or pending appointment and release the slot."""
+    if appointment.status not in {"Booked", PENDING_APPROVAL_STATUS}:
+        raise ValueError("Only booked or pending approval appointments can be cancelled.")
 
     if appointment.slot.start_at <= datetime.now():
         raise ValueError("Only future appointments can be cancelled.")
 
+    previous_status = appointment.status
     appointment.status = "Cancelled"
     appointment.slot.status = "Available"
     notify_user(
         appointment.patient_profile.user_id,
         "Appointment cancelled",
-        f"Your appointment on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was cancelled.",
+        f"Your {previous_status.lower()} appointment on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was cancelled.",
     )
     notify_user(
         appointment.staff_profile.user_id,
         "Appointment cancelled",
-        f"Appointment on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was cancelled.",
+        f"{previous_status} appointment on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was cancelled.",
     )
     log_action(
         "Appointment cancelled",
@@ -235,14 +291,68 @@ def cancel_appointment(appointment):
     return appointment
 
 
+def approve_extra_appointment(appointment):
+    """Approve a patient's extra appointment request and convert it to a booked appointment."""
+    if appointment.status != PENDING_APPROVAL_STATUS:
+        raise ValueError("Only pending approval appointments can be approved.")
+
+    if appointment.slot.start_at <= datetime.now():
+        raise ValueError("Only future appointment requests can be approved.")
+
+    appointment.status = "Booked"
+    appointment.slot.status = "Booked"
+    notify_user(
+        appointment.patient_profile.user_id,
+        "Extra appointment approved",
+        f"Your extra appointment request on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was approved.",
+    )
+    log_action(
+        "Extra appointment approved",
+        "Appointment",
+        appointment.id,
+        f"Approved extra request for {appointment.patient_profile.user.full_name}",
+    )
+    db.session.flush()
+    return appointment
+
+
+def reject_extra_appointment(appointment, internal_note=""):
+    """Reject a patient's extra appointment request and release the held slot."""
+    if appointment.status != PENDING_APPROVAL_STATUS:
+        raise ValueError("Only pending approval appointments can be rejected.")
+
+    if appointment.slot.start_at <= datetime.now():
+        raise ValueError("Only future appointment requests can be rejected.")
+
+    appointment.status = REJECTED_APPOINTMENT_STATUS
+    appointment.internal_note = internal_note or None
+    appointment.slot.status = "Available"
+    notify_user(
+        appointment.patient_profile.user_id,
+        "Extra appointment rejected",
+        f"Your extra appointment request on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was rejected. Please contact the practice if you still need urgent help.",
+    )
+    log_action(
+        "Extra appointment rejected",
+        "Appointment",
+        appointment.id,
+        f"Rejected extra request for {appointment.patient_profile.user.full_name}",
+    )
+    db.session.flush()
+    return appointment
+
+
 def update_appointment_status(appointment, status, internal_note=""):
     """Update appointment outcome after staff review or consultation."""
     allowed_statuses = {"Booked", "Completed", "Missed"}
     if status not in allowed_statuses:
         raise ValueError("Please choose a valid appointment status.")
 
-    if appointment.status == "Cancelled":
-        raise ValueError("Cancelled appointments cannot be updated.")
+    if appointment.status == PENDING_APPROVAL_STATUS:
+        raise ValueError("Pending approval appointments must be approved or rejected first.")
+
+    if appointment.status in {"Cancelled", REJECTED_APPOINTMENT_STATUS}:
+        raise ValueError("Cancelled or rejected appointments cannot be updated.")
 
     previous_status = appointment.status
     appointment.status = status

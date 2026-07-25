@@ -31,7 +31,7 @@ export interface RegisterResponse {
   user: User;
 }
 
-export type AppointmentStatus = 'Booked' | 'Completed' | 'Cancelled' | 'Missed';
+export type AppointmentStatus = 'Booked' | 'Pending Approval' | 'Completed' | 'Cancelled' | 'Missed' | 'Rejected';
 export type PrescriptionStatus = 'Requested' | 'Under Review' | 'Approved' | 'Ready for Collection' | 'Collected' | 'Rejected';
 export type PaymentStatus = 'Not required' | 'Pending' | 'Paid';
 
@@ -99,7 +99,7 @@ export interface StaffAvailabilityGeneratedSlot {
   id: string;
   startTime: string;
   endTime: string;
-  status: 'Available' | 'Booked' | string;
+  status: 'Available' | 'Booked' | 'Pending Approval' | string;
 }
 
 export interface StaffAvailabilityBlock {

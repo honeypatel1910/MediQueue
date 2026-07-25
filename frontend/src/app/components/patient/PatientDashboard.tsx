@@ -16,7 +16,7 @@ export function PatientDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const upcomingAppt = data.appointments.find(a => a.status === 'Booked' && new Date(a.date) >= new Date(new Date().toDateString()));
+  const upcomingAppt = data.appointments.find(a => ['Booked', 'Pending Approval'].includes(a.status) && new Date(a.date) >= new Date(new Date().toDateString()));
   const pendingPrescriptions = data.prescriptions.filter(p => ['Requested', 'Under Review', 'Approved'].includes(p.status));
   const approvedPending = data.prescriptions.find(p => p.status === 'Approved' && p.paymentStatus === 'Pending');
   const readyForCollection = data.prescriptions.find(p => p.status === 'Ready for Collection');

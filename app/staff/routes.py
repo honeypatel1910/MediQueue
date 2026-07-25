@@ -6,7 +6,15 @@ from flask_login import current_user, login_required
 from app.decorators import role_required
 from app.extensions import db
 from app.models import Appointment, AppointmentSlot, AvailabilityBlock, Prescription, ProfessionalRegister, StaffProfile
-from app.services import generate_slots_for_availability, log_action, update_appointment_status, validate_staff_availability_window
+from app.services import (
+    PENDING_APPROVAL_STATUS,
+    approve_extra_appointment,
+    generate_slots_for_availability,
+    log_action,
+    reject_extra_appointment,
+    update_appointment_status,
+    validate_staff_availability_window,
+)
 from app.staff import staff_bp
 from app.staff.forms import AppointmentStatusForm, AvailabilityForm, StaffProfileForm
 
@@ -207,6 +215,52 @@ def schedule():
     return render_template("staff/schedule.html", appointments=appointments)
 
 
+@staff_bp.route("/appointments/<int:appointment_id>/approve-extra", methods=["POST"])
+@login_required
+@role_required("Doctor", "Nurse")
+def approve_extra_request(appointment_id):
+    """Approve a pending extra appointment request from the staff schedule."""
+    profile = ensure_staff_profile(current_user)
+    appointment = Appointment.query.get_or_404(appointment_id)
+
+    if appointment.staff_profile_id != profile.id:
+        flash("You can only approve requests assigned to you.", "danger")
+        return redirect(url_for("staff.schedule"))
+
+    try:
+        approve_extra_appointment(appointment)
+        db.session.commit()
+        flash("Extra appointment request approved and booked.", "success")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+
+    return redirect(url_for("staff.schedule"))
+
+
+@staff_bp.route("/appointments/<int:appointment_id>/reject-extra", methods=["POST"])
+@login_required
+@role_required("Doctor", "Nurse")
+def reject_extra_request(appointment_id):
+    """Reject a pending extra appointment request and release the slot."""
+    profile = ensure_staff_profile(current_user)
+    appointment = Appointment.query.get_or_404(appointment_id)
+
+    if appointment.staff_profile_id != profile.id:
+        flash("You can only reject requests assigned to you.", "danger")
+        return redirect(url_for("staff.schedule"))
+
+    try:
+        reject_extra_appointment(appointment)
+        db.session.commit()
+        flash("Extra appointment request rejected and slot released.", "success")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+
+    return redirect(url_for("staff.schedule"))
+
+
 @staff_bp.route("/appointments/<int:appointment_id>/update", methods=["GET", "POST"])
 @login_required
 @role_required("Doctor", "Nurse")
@@ -216,6 +270,10 @@ def update_appointment(appointment_id):
 
     if appointment.staff_profile_id != profile.id:
         flash("You can only update appointments assigned to you.", "danger")
+        return redirect(url_for("staff.schedule"))
+
+    if appointment.status == PENDING_APPROVAL_STATUS:
+        flash("Pending extra appointment requests must be approved or rejected from the schedule page.", "warning")
         return redirect(url_for("staff.schedule"))
 
     form = AppointmentStatusForm(obj=appointment)
