@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Clock, Filter, MapPin, Search, Stethoscope } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Clock, Filter, MapPin, Search, Stethoscope, X } from 'lucide-react';
 import { apiFetch } from '../../api';
 import type { Appointment, AvailabilitySlot } from '../../types';
 
@@ -20,6 +20,13 @@ interface BookAppointmentResponse {
   message?: string;
 }
 
+interface BookingPopup {
+  variant: 'success' | 'approval';
+  title: string;
+  message: string;
+  detail: string;
+}
+
 function tomorrowDate() {
   const value = new Date();
   value.setDate(value.getDate() + 1);
@@ -38,12 +45,15 @@ export function BookAppointment() {
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [bookingPopup, setBookingPopup] = useState<BookingPopup | null>(null);
 
   const selectedSlot = useMemo(() => slots.find((slot) => slot.id === selectedSlotId) || null, [slots, selectedSlotId]);
 
-  const loadSlots = async () => {
+  const loadSlots = async ({ clearFeedback = true }: { clearFeedback?: boolean } = {}) => {
     setError('');
-    setMessage('');
+    if (clearFeedback) {
+      setMessage('');
+    }
     const params = new URLSearchParams();
     if (date) params.set('date', date);
     if (staffId) params.set('staffId', staffId);
@@ -63,6 +73,7 @@ export function BookAppointment() {
 
   const handleSearch = async (event: React.FormEvent) => {
     event.preventDefault();
+    setBookingPopup(null);
     setLoading(true);
     await loadSlots()
       .catch((err) => setError(err.message || 'Available appointments could not be loaded.'))
@@ -78,6 +89,7 @@ export function BookAppointment() {
     setBooking(true);
     setError('');
     setMessage('');
+    setBookingPopup(null);
 
     try {
       const data = await apiFetch<BookAppointmentResponse>('/api/appointments/book', {
@@ -85,17 +97,36 @@ export function BookAppointment() {
         body: JSON.stringify({ slotId: selectedSlotId, reason }),
       });
 
+      const appointmentSummary = `${new Date(data.appointment.date).toLocaleDateString('en-GB')} at ${data.appointment.time}`;
+
       if (data.appointment.status === 'Pending Approval') {
-        setMessage(data.message || `Extra appointment request sent to ${data.appointment.doctorName} for approval.`);
-      } else {
-        setMessage(
+        const approvalMessage =
           data.message ||
-            `Appointment booked with ${data.appointment.doctorName} on ${new Date(data.appointment.date).toLocaleDateString('en-GB')} at ${data.appointment.time}.`,
-        );
+          `Your extra appointment request with ${data.appointment.doctorName} has been sent for approval. Please wait for staff approval before attending.`;
+        setMessage(approvalMessage);
+        setBookingPopup({
+          variant: 'approval',
+          title: 'Waiting for staff approval',
+          message: approvalMessage,
+          detail: `${data.appointment.doctorName} · ${appointmentSummary}`,
+        });
+      } else {
+        const bookedMessage =
+          data.message ||
+          `Appointment confirmed with ${data.appointment.doctorName} on ${appointmentSummary}.`;
+        setMessage(bookedMessage);
+        setBookingPopup({
+          variant: 'success',
+          title: 'Appointment confirmed',
+          message: bookedMessage,
+          detail: `${data.appointment.doctorName} · ${appointmentSummary}`,
+        });
       }
+
       setReason('');
-      await loadSlots();
+      await loadSlots({ clearFeedback: false });
     } catch (err) {
+      setBookingPopup(null);
       setError(err instanceof Error ? err.message : 'Appointment could not be booked.');
     } finally {
       setBooking(false);
@@ -266,6 +297,59 @@ export function BookAppointment() {
           )}
         </aside>
       </div>
+
+      {bookingPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                  bookingPopup.variant === 'approval' ? 'bg-amber-50' : 'bg-green-50'
+                }`}
+              >
+                {bookingPopup.variant === 'approval' ? (
+                  <AlertCircle size={24} className="text-amber-600" />
+                ) : (
+                  <CheckCircle2 size={24} className="text-green-600" />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setBookingPopup(null)}
+                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Close appointment confirmation"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <h3 className="text-xl font-bold text-slate-950">{bookingPopup.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{bookingPopup.message}</p>
+              <div
+                className={`mt-4 rounded-2xl px-4 py-3 text-sm font-medium ${
+                  bookingPopup.variant === 'approval'
+                    ? 'bg-amber-50 text-amber-800'
+                    : 'bg-green-50 text-green-800'
+                }`}
+              >
+                {bookingPopup.detail}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setBookingPopup(null)}
+              className={`mt-6 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
+                bookingPopup.variant === 'approval' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {bookingPopup.variant === 'approval' ? 'Okay, I will wait' : 'Done'}
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

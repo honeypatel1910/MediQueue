@@ -917,11 +917,12 @@ def book_available_appointment():
         db.session.rollback()
         return json_error(str(exc), 400)
 
-    message = "Appointment booked successfully."
+    message = "Appointment confirmed. Your slot has been booked successfully."
     if appointment.status == PENDING_APPROVAL_STATUS:
         message = (
             "You already have 3 active upcoming appointments with this clinician. "
-            "This extra appointment request has been sent for approval."
+            "Your extra appointment request has been sent to staff for approval. "
+            "Please wait until it is approved before attending."
         )
 
     return jsonify({"ok": True, "appointment": appointment_json(appointment), "message": message})
