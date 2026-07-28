@@ -5,6 +5,12 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 
+from app.email_verification import (
+    email_is_verified,
+    issue_registration_otp,
+    resend_registration_otp,
+    verify_registration_otp,
+)
 from app.extensions import csrf, db
 from app.models import (
     AuditLog,
@@ -62,6 +68,7 @@ def user_json(user):
         "email": user.email,
         "role": role_to_frontend(user.role.name if user.role else "Patient"),
         "active": bool(user.active),
+        "emailVerified": email_is_verified(user),
     }
 
     if user.staff_profile:
@@ -286,6 +293,16 @@ def login():
 
     user = User.query.filter_by(email=email).first()
     if user and user.is_active and user.check_password(password):
+        if not email_is_verified(user):
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Please verify your email OTP before signing in.",
+                    "code": "EMAIL_NOT_VERIFIED",
+                    "email": user.email,
+                }
+            ), 403
+
         login_user(user, remember=remember)
         log_action("User login", "User", user.id, "Successful API login")
         db.session.commit()
@@ -355,6 +372,7 @@ def register():
     )
     db.session.add(profile)
     log_action("Patient registration", "User", user.id, "New patient account created through API", user_id=user.id)
+    _, email_sent = issue_registration_otp(user)
 
     try:
         db.session.commit()
@@ -362,7 +380,52 @@ def register():
         db.session.rollback()
         return json_error("This account could not be created. Please check the details and try again.")
 
-    return jsonify({"ok": True, "user": user_json(user)}), 201
+    return jsonify(
+        {
+            "ok": True,
+            "email": user.email,
+            "emailVerificationRequired": True,
+            "emailSent": email_sent,
+            "message": "Patient account created. Please verify the OTP sent to your registered email before signing in.",
+        }
+    ), 201
+
+
+@api_bp.post("/verify-email")
+def verify_email():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email") or ""
+    otp_code = data.get("otp") or data.get("otpCode") or ""
+
+    success, message, user = verify_registration_otp(email, otp_code)
+    db.session.commit()
+
+    if not success:
+        return json_error(message, 400)
+
+    if user:
+        log_action("Email OTP verified", "User", user.id, "Patient verified registration email", user_id=user.id)
+        db.session.commit()
+
+    return jsonify({"ok": True, "message": message})
+
+
+@api_bp.post("/resend-email-otp")
+def resend_email_otp():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email") or ""
+
+    success, message, email_sent, user = resend_registration_otp(email)
+    db.session.commit()
+
+    if not success:
+        return json_error(message, 400)
+
+    if user:
+        log_action("Email OTP resent", "User", user.id, "Patient requested a new registration OTP", user_id=user.id)
+        db.session.commit()
+
+    return jsonify({"ok": True, "message": message, "emailSent": email_sent})
 
 
 @api_bp.get("/patient/dashboard")
@@ -917,12 +980,11 @@ def book_available_appointment():
         db.session.rollback()
         return json_error(str(exc), 400)
 
-    message = "Appointment confirmed. Your slot has been booked successfully."
+    message = "Appointment booked successfully."
     if appointment.status == PENDING_APPROVAL_STATUS:
         message = (
             "You already have 3 active upcoming appointments with this clinician. "
-            "Your extra appointment request has been sent to staff for approval. "
-            "Please wait until it is approved before attending."
+            "This extra appointment request has been sent for approval."
         )
 
     return jsonify({"ok": True, "appointment": appointment_json(appointment), "message": message})

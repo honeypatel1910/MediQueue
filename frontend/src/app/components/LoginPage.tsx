@@ -3,7 +3,7 @@ import { Eye, EyeOff, Stethoscope, AlertCircle } from 'lucide-react';
 import { useApp } from '../AppContext';
 
 export function LoginPage() {
-  const { login, setCurrentPage } = useApp();
+  const { login, setCurrentPage, setPendingVerificationEmail } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -17,7 +17,11 @@ export function LoginPage() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'We could not sign you in.');
+      const message = err instanceof Error ? err.message : 'We could not sign you in.';
+      if (message.toLowerCase().includes('verify')) {
+        setPendingVerificationEmail(email);
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -37,9 +41,23 @@ export function LoginPage() {
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
-                <AlertCircle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
-                <p className="text-red-700 text-sm">{error}</p>
+              <div className="space-y-3 rounded-2xl border border-red-100 bg-red-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+                {error.toLowerCase().includes('verify') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingVerificationEmail(email);
+                      setCurrentPage('verify-email');
+                    }}
+                    className="w-full rounded-xl bg-white px-4 py-2 text-sm font-semibold text-red-700 border border-red-100 hover:bg-red-100 transition-colors"
+                  >
+                    Verify email OTP
+                  </button>
+                )}
               </div>
             )}
 

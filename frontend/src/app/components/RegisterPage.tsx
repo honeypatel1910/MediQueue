@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Stethoscope, CheckCircle, AlertCircle } from 'lucide-react';
+import { Stethoscope, AlertCircle } from 'lucide-react';
 import { useApp } from '../AppContext';
 import { postJson } from '../api';
+import type { RegisterResponse } from '../types';
 
 type FieldProps = {
   id: string;
@@ -35,8 +36,7 @@ function Field({ id, label, type = 'text', placeholder, value, error, onChange, 
 }
 
 export function RegisterPage() {
-  const { setCurrentPage } = useApp();
-  const [submitted, setSubmitted] = useState(false);
+  const { setCurrentPage, setPendingVerificationEmail } = useApp();
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -69,31 +69,16 @@ export function RegisterPage() {
     if (Object.keys(errs).length) return;
     setLoading(true);
     try {
-      await postJson('/api/register', form);
-      setSubmitted(true);
+      const data = await postJson<RegisterResponse>('/api/register', form);
+      const verificationEmail = data.email || form.email.trim().toLowerCase();
+      setPendingVerificationEmail(verificationEmail);
+      setCurrentPage('verify-email');
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Registration failed.');
     } finally {
       setLoading(false);
     }
   };
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-10 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle size={32} className="text-green-600" />
-          </div>
-          <h1 className="font-bold text-slate-900 text-2xl mb-2">Account created</h1>
-          <p className="text-slate-500 mb-8">Your patient account has been created. You can now sign in and start using MediQueue.</p>
-          <button onClick={() => setCurrentPage('login')} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
-            Go to sign in
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-12">

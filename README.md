@@ -28,6 +28,7 @@ MediQueue is a secure web-based GP appointment and prescription management syste
 - Audit logging
 - CSV report exports for appointments and prescriptions
 - JSON API foundation for React authentication
+- Email OTP verification for new patient registration
 
 ## Setup
 
@@ -55,6 +56,46 @@ SECRET_KEY=change-this-secret-key
 ```
 
 If `DATABASE_URL` is not set, the app falls back to SQLite for local development.
+
+
+## Email OTP verification setup
+
+New patient registrations now require email OTP verification before login. Demo accounts are intentionally kept as seeded test accounts and are treated as already verified so assessment/demo logins continue to work:
+
+```text
+admin@mediqueue.health
+doctor@mediqueue.health
+nurse@mediqueue.health
+patient@mediqueue.health
+```
+
+Use a real email address only when testing new patient registration. Configure SMTP values in your local `.env` file. Do not commit real SMTP credentials.
+
+```text
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USE_SSL=false
+MAIL_USERNAME=your_email@example.com
+MAIL_PASSWORD=your_email_app_password
+MAIL_DEFAULT_SENDER=MediQueue <your_email@example.com>
+MAIL_SUPPRESS_SEND=false
+EMAIL_OTP_EXPIRY_MINUTES=10
+```
+
+For safe testing, Mailtrap is recommended. If `MAIL_SUPPRESS_SEND=true`, the app still creates the OTP record but does not send a real email.
+
+Because this chunk adds a new database table, run this once after applying the chunk:
+
+```bash
+flask --app run.py init-db
+```
+
+If you are using disposable local test data and want a clean state, you can instead run:
+
+```bash
+flask --app run.py reset-db --yes
+```
 
 ## Demo accounts
 

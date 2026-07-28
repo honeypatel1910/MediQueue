@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: UserRole;
   active?: boolean;
+  emailVerified?: boolean;
   patientReference?: string | null;
   jobTitle?: string | null;
   department?: string | null;
@@ -28,7 +29,10 @@ export interface LoginResponse {
 
 export interface RegisterResponse {
   ok: boolean;
-  user: User;
+  email: string;
+  emailVerificationRequired: boolean;
+  emailSent: boolean;
+  message: string;
 }
 
 export type AppointmentStatus = 'Booked' | 'Pending Approval' | 'Completed' | 'Cancelled' | 'Missed' | 'Rejected';
@@ -118,6 +122,7 @@ export type Page =
   | 'landing'
   | 'login'
   | 'register'
+  | 'verify-email'
   | 'patient-dashboard'
   | 'book-appointment'
   | 'appointment-history'

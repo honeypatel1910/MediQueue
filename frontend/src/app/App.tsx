@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './AppContext';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
+import { VerifyEmailPage } from './components/VerifyEmailPage';
 import { Layout } from './components/shared/Layout';
 import { StatusBadge } from './components/shared/StatusBadge';
 import { PatientDashboard } from './components/patient/PatientDashboard';
@@ -30,6 +31,7 @@ const PAGE_TITLES: Record<Page, string> = {
   landing: 'MediQueue',
   login: 'Sign in',
   register: 'Create account',
+  'verify-email': 'Verify email',
   'patient-dashboard': 'Patient Dashboard',
   'book-appointment': 'Book Appointment',
   'appointment-history': 'My Appointments',
@@ -142,6 +144,7 @@ function AppRouter() {
   if (!currentUser) {
     if (currentPage === 'login') return <LoginPage />;
     if (currentPage === 'register') return <RegisterPage />;
+    if (currentPage === 'verify-email') return <VerifyEmailPage />;
     return <LandingPage />;
   }
 

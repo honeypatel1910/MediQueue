@@ -2,6 +2,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.auth.forms import LoginForm, RegistrationForm
+from app.email_verification import email_is_verified, issue_registration_otp
 from app.extensions import db
 from app.models import PatientProfile, Role, User
 from app.services import log_action
@@ -40,6 +41,10 @@ def login():
         user = User.query.filter_by(email=email).first()
 
         if user and user.is_active and user.check_password(form.password.data):
+            if not email_is_verified(user):
+                flash("Please verify your email OTP before signing in.", "warning")
+                return redirect(url_for("index"))
+
             login_user(user, remember=form.remember.data)
             log_action("User login", "User", user.id, "Successful login")
             db.session.commit()
@@ -74,10 +79,11 @@ def register():
         db.session.flush()
         user.patient_profile = PatientProfile(patient_reference=f"MQP-{user.id:05d}")
         log_action("Patient registration", "User", user.id, "New patient account created", user_id=user.id)
+        issue_registration_otp(user)
         db.session.commit()
 
-        flash("Patient account created. You can now log in.", "success")
-        return redirect(url_for("auth.login"))
+        flash("Patient account created. Please verify the OTP sent to your registered email before logging in.", "success")
+        return redirect(url_for("index"))
 
     return render_template("auth/register.html", form=form)
 

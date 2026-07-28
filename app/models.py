@@ -59,6 +59,12 @@ class User(UserMixin, db.Model):
         back_populates="user",
         order_by="AuditLog.created_at.desc()",
     )
+    email_verifications = db.relationship(
+        "EmailVerification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        order_by="EmailVerification.created_at.desc()",
+    )
 
     @property
     def is_active(self):
@@ -80,6 +86,38 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f"<User {self.email}>"
+
+
+
+class EmailVerification(db.Model):
+    """Email OTP verification record for patient registration."""
+
+    __tablename__ = "email_verifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    email = db.Column(db.String(255), nullable=False, index=True)
+    purpose = db.Column(db.String(50), default="registration", nullable=False)
+    otp_hash = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(30), default="Pending", nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    verified_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", back_populates="email_verifications")
+
+    def set_otp(self, otp_code):
+        self.otp_hash = generate_password_hash(otp_code)
+
+    def check_otp(self, otp_code):
+        return check_password_hash(self.otp_hash, otp_code)
+
+    @property
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
+
+    def __repr__(self):
+        return f"<EmailVerification {self.email} {self.status}>"
 
 
 class PatientProfile(db.Model):

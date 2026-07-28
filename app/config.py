@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
 
+
+def _env_bool(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -27,6 +31,18 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+
+    # Email / SMTP settings used by registration OTP verification.
+    # Real credentials should be stored only in .env, never committed to Git.
+    MAIL_SERVER = os.getenv("MAIL_SERVER", "")
+    MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
+    MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", "true")
+    MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", "false")
+    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", MAIL_USERNAME or "MediQueue <no-reply@mediqueue.local>")
+    MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", "true")
+    EMAIL_OTP_EXPIRY_MINUTES = int(os.getenv("EMAIL_OTP_EXPIRY_MINUTES", "10"))
 
     database_url = os.getenv("DATABASE_URL")
 

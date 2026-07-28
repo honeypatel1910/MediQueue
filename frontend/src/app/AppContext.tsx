@@ -14,6 +14,8 @@ interface AppContextType {
   setUnreadCount: (n: number) => void;
   refreshSession: () => Promise<void>;
   loadingSession: boolean;
+  pendingVerificationEmail: string;
+  setPendingVerificationEmail: (email: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -25,12 +27,39 @@ function defaultPageForRole(role: User['role']): Page {
   return 'admin-dashboard';
 }
 
+function readPendingVerificationEmail() {
+  try {
+    return window.localStorage.getItem('mediqueue.pendingVerificationEmail') || '';
+  } catch {
+    return '';
+  }
+}
+
+function storePendingVerificationEmail(email: string) {
+  try {
+    if (email) {
+      window.localStorage.setItem('mediqueue.pendingVerificationEmail', email);
+    } else {
+      window.localStorage.removeItem('mediqueue.pendingVerificationEmail');
+    }
+  } catch {
+    // Local storage is optional; keep the in-memory state working.
+  }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingSession, setLoadingSession] = useState(true);
+  const [pendingVerificationEmailState, setPendingVerificationEmailState] = useState(readPendingVerificationEmail);
+
+  const setPendingVerificationEmail = (email: string) => {
+    const normalised = email.trim().toLowerCase();
+    setPendingVerificationEmailState(normalised);
+    storePendingVerificationEmail(normalised);
+  };
 
   const refreshSession = async () => {
     const data = await apiFetch<SessionResponse>('/api/session');
@@ -47,6 +76,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const data = await postJson<{ ok: boolean; user: User; unreadCount: number }>('/api/login', { email, password });
     setCurrentUser(data.user);
     setUnreadCount(data.unreadCount || 0);
+    setPendingVerificationEmail('');
     setCurrentPage(defaultPageForRole(data.user.role));
   };
 
@@ -59,7 +89,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ currentUser, currentPage, setCurrentPage, login, logout, selectedPrescription, setSelectedPrescription, unreadCount, setUnreadCount, refreshSession, loadingSession }}>
+    <AppContext.Provider
+      value={{
+        currentUser,
+        currentPage,
+        setCurrentPage,
+        login,
+        logout,
+        selectedPrescription,
+        setSelectedPrescription,
+        unreadCount,
+        setUnreadCount,
+        refreshSession,
+        loadingSession,
+        pendingVerificationEmail: pendingVerificationEmailState,
+        setPendingVerificationEmail,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
