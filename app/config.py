@@ -44,6 +44,12 @@ class Config:
     MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", "true")
     EMAIL_OTP_EXPIRY_MINUTES = int(os.getenv("EMAIL_OTP_EXPIRY_MINUTES", "10"))
 
+    # Email copies of in-app notifications. Keep enabled for the feature,
+    # but use MAIL_SUPPRESS_SEND=true or MAIL_SEND_NOTIFICATIONS=false in
+    # development when SMTP is not configured.
+    MAIL_SEND_NOTIFICATIONS = _env_bool("MAIL_SEND_NOTIFICATIONS", "true")
+    MAIL_REDIRECT_ALL_TO = os.getenv("MAIL_REDIRECT_ALL_TO", "").strip()
+
     database_url = os.getenv("DATABASE_URL")
 
     if database_url:

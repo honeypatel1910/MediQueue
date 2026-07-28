@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
 
-from flask import request
+from flask import current_app, request
 from flask_login import current_user
 
 from app.extensions import db
-from app.models import Appointment, AppointmentSlot, AuditLog, AvailabilityBlock, Notification
+from app.models import Appointment, AppointmentSlot, AuditLog, AvailabilityBlock, Notification, Role, User
 
 
 STANDARD_APPOINTMENT_LIMIT_PER_STAFF = 3
@@ -14,11 +14,58 @@ ACTIVE_APPOINTMENT_STATUSES = {"Booked", PENDING_APPROVAL_STATUS}
 FINAL_APPOINTMENT_STATUSES = {"Cancelled", "Completed", "Missed", REJECTED_APPOINTMENT_STATUS}
 
 
-def notify_user(user_id, title, message):
-    """Create an in-app notification for one user."""
+def notification_emails_enabled():
+    """Return whether in-app notifications should also be emailed."""
+    return bool(current_app.config.get("MAIL_SEND_NOTIFICATIONS", True))
+
+
+def notify_user(user_id, title, message, *, send_email=True):
+    """Create an in-app notification and optionally send an email copy.
+
+    Email delivery is deliberately best-effort. If SMTP is unavailable or a
+    demo placeholder address cannot receive mail, the in-app notification still
+    works and the database transaction is not failed.
+    """
     notification = Notification(user_id=user_id, title=title, message=message)
     db.session.add(notification)
+
+    if send_email and notification_emails_enabled():
+        try:
+            user = db.session.get(User, int(user_id))
+            if user and user.active:
+                from app.email_service import send_notification_email
+
+                send_notification_email(user, title, message)
+        except Exception as exc:  # pragma: no cover - external SMTP safe fallback
+            current_app.logger.warning(
+                "Notification email failed for user_id=%s title=%s: %s",
+                user_id,
+                title,
+                exc,
+            )
+
     return notification
+
+
+def notify_role(role_names, title, message, *, exclude_user_ids=None, send_email=True):
+    """Notify every active user with one or more role names."""
+    if isinstance(role_names, str):
+        role_names = [role_names]
+
+    exclude_user_ids = set(exclude_user_ids or [])
+    users = (
+        User.query.join(Role)
+        .filter(Role.name.in_(role_names))
+        .filter(User.active.is_(True))
+        .all()
+    )
+
+    notifications = []
+    for user in users:
+        if user.id in exclude_user_ids:
+            continue
+        notifications.append(notify_user(user.id, title, message, send_email=send_email))
+    return notifications
 
 
 def log_action(action, entity_type=None, entity_id=None, details=None, user_id=None):

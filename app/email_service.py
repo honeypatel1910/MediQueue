@@ -44,6 +44,16 @@ def send_email(to_email, subject, text_body=None, html_body=None):
         current_app.logger.warning("Email not sent because SMTP server/sender is not configured.")
         return False
 
+    original_recipient = to_email
+    redirect_recipient = (current_app.config.get("MAIL_REDIRECT_ALL_TO") or "").strip()
+    if redirect_recipient:
+        to_email = redirect_recipient
+        subject = f"[Originally to {original_recipient}] {subject}"
+        if text_body:
+            text_body = f"Original recipient: {original_recipient}\n\n{text_body}"
+        if html_body:
+            html_body = f"<p><strong>Original recipient:</strong> {escape(original_recipient)}</p>" + html_body
+
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = sender
@@ -100,6 +110,40 @@ def send_registration_otp_email(user, otp_code, expires_in_minutes=10):
     return send_email(
         user.email,
         "Your MediQueue email verification code",
+        text_body=text_body,
+        html_body=html_body,
+    )
+
+
+def send_notification_email(user, title, message):
+    """Send an email copy of an in-app notification to one user."""
+    if user is None or not getattr(user, "email", None):
+        return False
+
+    display_name = escape(getattr(user, "first_name", None) or "MediQueue user")
+    safe_title = escape(title or "MediQueue notification")
+    safe_message = escape(message or "")
+
+    text_body = (
+        f"Hello {getattr(user, 'first_name', None) or 'MediQueue user'},\n\n"
+        f"{title}\n\n"
+        f"{message}\n\n"
+        "This email was sent because you received an in-app notification in MediQueue."
+    )
+    html_body = f"""
+    <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6;">
+      <h2 style="color: #2563eb;">MediQueue notification</h2>
+      <p>Hello {display_name},</p>
+      <h3>{safe_title}</h3>
+      <p>{safe_message}</p>
+      <p style="color: #475569; font-size: 13px;">
+        This email was sent because you received an in-app notification in MediQueue.
+      </p>
+    </div>
+    """
+    return send_email(
+        user.email,
+        f"MediQueue notification: {title}",
         text_body=text_body,
         html_body=html_body,
     )

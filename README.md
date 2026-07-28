@@ -25,6 +25,7 @@ MediQueue is a secure web-based GP appointment and prescription management syste
 - Doctor prescription review workflow
 - Simulated prescription payment flow
 - In-app notifications
+- Email notification copies for appointment and prescription alerts
 - Audit logging
 - CSV report exports for appointments and prescriptions
 - JSON API foundation for React authentication
@@ -96,6 +97,25 @@ If you are using disposable local test data and want a clean state, you can inst
 ```bash
 flask --app run.py reset-db --yes
 ```
+
+## Email notification setup
+
+MediQueue now sends email copies for the same important alerts that are created as in-app notifications. This includes appointment booking, extra appointment approval requests, appointment approval/rejection, cancellations, prescription updates, prescription payment, and prescription collection updates.
+
+Keep these settings in your local `.env` file:
+
+```text
+MAIL_SEND_NOTIFICATIONS=true
+MAIL_REDIRECT_ALL_TO=
+```
+
+For a live demo with seeded users such as `doctor@mediqueue.health`, set `MAIL_REDIRECT_ALL_TO` to one real inbox. The app will send all outgoing emails to that inbox while showing the original recipient in the email subject/body. This avoids relying on placeholder demo email addresses.
+
+```text
+MAIL_REDIRECT_ALL_TO=your_email@example.com
+```
+
+If SMTP is unavailable, email sending is safely skipped and the in-app notification still works.
 
 ## Demo accounts
 

@@ -9,7 +9,7 @@ from app.extensions import db
 from app.models import PatientProfile, Prescription
 from app.prescriptions import prescriptions_bp
 from app.prescriptions.forms import PrescriptionPaymentForm, PrescriptionRequestForm, PrescriptionReviewForm
-from app.services import log_action, notify_user
+from app.services import log_action, notify_role, notify_user
 
 
 PRESCRIPTION_STANDARD_FEE = 9.90
@@ -42,6 +42,17 @@ def request_prescription():
         )
         db.session.add(prescription)
         db.session.flush()
+        notify_user(
+            profile.user_id,
+            "Prescription request submitted",
+            f"Your prescription request for {prescription.medicine_name} has been submitted and is awaiting doctor review.",
+        )
+        notify_role(
+            "Doctor",
+            "New prescription request",
+            f"{current_user.full_name} requested {prescription.medicine_name}. Please review the request in MediQueue.",
+            exclude_user_ids={current_user.id},
+        )
         log_action(
             "Prescription requested",
             "Prescription",

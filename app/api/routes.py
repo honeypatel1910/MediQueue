@@ -33,6 +33,7 @@ from app.services import (
     cancel_appointment,
     generate_slots_for_availability,
     log_action,
+    notify_role,
     notify_user,
     reject_extra_appointment,
     update_appointment_status,
@@ -1138,6 +1139,17 @@ def request_prescription_from_api():
     )
     db.session.add(prescription)
     db.session.flush()
+    notify_user(
+        profile.user_id,
+        "Prescription request submitted",
+        f"Your prescription request for {prescription.medicine_name} has been submitted and is awaiting doctor review.",
+    )
+    notify_role(
+        "Doctor",
+        "New prescription request",
+        f"{current_user.full_name} requested {prescription.medicine_name}. Please review the request in MediQueue.",
+        exclude_user_ids={current_user.id},
+    )
     log_action(
         "Prescription requested",
         "Prescription",
