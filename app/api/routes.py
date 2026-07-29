@@ -26,6 +26,7 @@ from app.models import (
     User,
 )
 from app.prescriptions.routes import PRESCRIPTION_STANDARD_FEE
+from app.report_exports import ReportFilterError, build_report_summary, parse_report_filters
 from app.services import (
     PENDING_APPROVAL_STATUS,
     approve_extra_appointment,
@@ -1463,26 +1464,14 @@ def audit_logs_from_api():
 @api_bp.get("/reports/summary")
 @login_required
 def reports_summary_from_api():
-    """Return reporting summary data for the React admin reports page."""
+    """Return filtered reporting summary data for the React admin reports page."""
     if not current_user.has_role("Practice Admin"):
         return json_error("Practice admin access required.", 403)
 
-    total_appointments = Appointment.query.count()
-    completed_appointments = Appointment.query.filter_by(status="Completed").count()
-    cancelled_appointments = Appointment.query.filter_by(status="Cancelled").count()
-    total_prescriptions = Prescription.query.count()
-    paid_prescriptions = Prescription.query.filter_by(payment_status="Paid").count()
+    try:
+        start_date, end_date = parse_report_filters(request.args)
+    except ReportFilterError as exc:
+        return json_error(str(exc), 400)
 
-    return jsonify(
-        {
-            "ok": True,
-            "summary": {
-                "appointments": total_appointments,
-                "completedAppointments": completed_appointments,
-                "cancelledAppointments": cancelled_appointments,
-                "prescriptions": total_prescriptions,
-                "paidPrescriptions": paid_prescriptions,
-            },
-        }
-    )
+    return jsonify({"ok": True, "summary": build_report_summary(start_date, end_date)})
 

@@ -7,9 +7,33 @@
     <div>
         <p class="text-uppercase text-primary fw-semibold small mb-2">Practice Admin</p>
         <h1 class="h3 fw-bold mb-1">Reports</h1>
-        <p class="text-muted mb-0">Download operational reports for appointments and prescriptions.</p>
+        <p class="text-muted mb-0">Download filtered CSV and PDF reports for appointments and prescriptions.</p>
     </div>
     <a class="btn btn-outline-primary" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+        <form class="row g-3 align-items-end" method="get" action="{{ url_for('reports.index') }}">
+            <div class="col-md-4">
+                <label class="form-label">From</label>
+                <input class="form-control" type="date" name="start_date" value="{{ filters.start_date }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">To</label>
+                <input class="form-control" type="date" name="end_date" value="{{ filters.end_date }}">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Apply Filter</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('reports.index') }}">Clear</a>
+            </div>
+        </form>
+        {% if filter_error %}
+            <div class="alert alert-danger mt-3 mb-0">{{ filter_error }}</div>
+        {% else %}
+            <p class="text-muted small mt-3 mb-0">Current reporting period: {{ period_label }}</p>
+        {% endif %}
+    </div>
 </div>
 
 <div class="row g-4 mb-4">
@@ -33,11 +57,15 @@
             <div class="card-body p-4">
                 <h2 class="h5 fw-bold mb-3">Appointment report</h2>
                 <div class="row g-3 mb-4">
-                    <div class="col-4"><div class="border rounded p-3"><p class="text-muted small mb-1">Booked</p><p class="h4 mb-0">{{ booked_appointments }}</p></div></div>
-                    <div class="col-4"><div class="border rounded p-3"><p class="text-muted small mb-1">Completed</p><p class="h4 mb-0">{{ completed_appointments }}</p></div></div>
-                    <div class="col-4"><div class="border rounded p-3"><p class="text-muted small mb-1">Cancelled</p><p class="h4 mb-0">{{ cancelled_appointments }}</p></div></div>
+                    <div class="col-6 col-md-3"><div class="border rounded p-3"><p class="text-muted small mb-1">Booked</p><p class="h4 mb-0">{{ booked_appointments }}</p></div></div>
+                    <div class="col-6 col-md-3"><div class="border rounded p-3"><p class="text-muted small mb-1">Pending</p><p class="h4 mb-0">{{ pending_approval_appointments }}</p></div></div>
+                    <div class="col-6 col-md-3"><div class="border rounded p-3"><p class="text-muted small mb-1">Completed</p><p class="h4 mb-0">{{ completed_appointments }}</p></div></div>
+                    <div class="col-6 col-md-3"><div class="border rounded p-3"><p class="text-muted small mb-1">Cancelled</p><p class="h4 mb-0">{{ cancelled_appointments }}</p></div></div>
                 </div>
-                <a class="btn btn-primary" href="{{ url_for('reports.appointments_csv') }}">Download Appointments CSV</a>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-primary" href="{{ url_for('reports.appointments_csv', start_date=filters.start_date, end_date=filters.end_date) }}">Download CSV</a>
+                    <a class="btn btn-outline-primary" href="{{ url_for('reports.appointments_pdf', start_date=filters.start_date, end_date=filters.end_date) }}">Download PDF</a>
+                </div>
             </div>
         </div>
     </div>
@@ -49,7 +77,10 @@
                     <div class="col-6"><div class="border rounded p-3"><p class="text-muted small mb-1">Pending Review</p><p class="h4 mb-0">{{ pending_prescriptions }}</p></div></div>
                     <div class="col-6"><div class="border rounded p-3"><p class="text-muted small mb-1">Paid</p><p class="h4 mb-0">{{ paid_prescriptions }}</p></div></div>
                 </div>
-                <a class="btn btn-primary" href="{{ url_for('reports.prescriptions_csv') }}">Download Prescriptions CSV</a>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-primary" href="{{ url_for('reports.prescriptions_csv', start_date=filters.start_date, end_date=filters.end_date) }}">Download CSV</a>
+                    <a class="btn btn-outline-primary" href="{{ url_for('reports.prescriptions_pdf', start_date=filters.start_date, end_date=filters.end_date) }}">Download PDF</a>
+                </div>
             </div>
         </div>
     </div>

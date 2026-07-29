@@ -1,64 +1,108 @@
-import csv
-from io import StringIO
-
-from flask import Response, render_template
+from flask import render_template, request
 from flask_login import login_required
+from reportlab.lib.units import cm
 
 from app.decorators import role_required
-from app.models import Appointment, AppointmentSlot, PatientProfile, Prescription, StaffProfile
+from app.models import AppointmentSlot, PatientProfile, Prescription, StaffProfile
+from app.report_exports import (
+    ReportFilterError,
+    appointment_query,
+    appointment_rows,
+    build_report_summary,
+    csv_response,
+    filter_values,
+    parse_report_filters,
+    pdf_response,
+    prescription_query,
+    prescription_rows,
+    report_period_label,
+)
 from app.reports import reports_bp
 
 
-def _format_datetime(value, fmt="%d %b %Y %H:%M"):
-    if not value:
-        return ""
-    return value.strftime(fmt)
+APPOINTMENT_CSV_HEADERS = [
+    "Appointment ID",
+    "Date",
+    "Start Time",
+    "End Time",
+    "Patient Name",
+    "Patient Email",
+    "Clinical Staff",
+    "Staff Role",
+    "Reason",
+    "Status",
+    "Created At",
+]
+
+PRESCRIPTION_CSV_HEADERS = [
+    "Prescription ID",
+    "Requested At",
+    "Patient Name",
+    "Patient Email",
+    "Medicine",
+    "Quantity",
+    "Reason",
+    "Status",
+    "Payment Status",
+    "Amount Due",
+    "Payment Reference",
+    "Reviewed By",
+    "Reviewed At",
+]
+
+APPOINTMENT_PDF_HEADERS = ["ID", "Date", "Time", "Patient", "Clinical Staff", "Role", "Status", "Reason"]
+APPOINTMENT_PDF_WIDTHS = [1.1 * cm, 2.0 * cm, 2.2 * cm, 3.0 * cm, 3.0 * cm, 2.0 * cm, 2.3 * cm, 8.5 * cm]
+
+PRESCRIPTION_PDF_HEADERS = ["ID", "Requested", "Patient", "Medicine", "Quantity", "Status", "Payment", "Amount", "Reviewed By"]
+PRESCRIPTION_PDF_WIDTHS = [1.1 * cm, 3.0 * cm, 3.1 * cm, 3.3 * cm, 2.2 * cm, 2.6 * cm, 2.2 * cm, 1.8 * cm, 3.6 * cm]
 
 
-def _csv_response(filename, rows):
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerows(rows)
+def _current_filters():
+    return parse_report_filters(request.args)
 
-    response = Response(output.getvalue(), mimetype="text/csv; charset=utf-8")
-    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
-    return response
+
+def _appointment_export_items(start_date=None, end_date=None):
+    return appointment_query(start_date, end_date).order_by(AppointmentSlot.start_at.desc()).all()
+
+
+def _prescription_export_items(start_date=None, end_date=None):
+    return prescription_query(start_date, end_date).order_by(Prescription.created_at.desc()).all()
 
 
 @reports_bp.route("/")
 @login_required
 @role_required("Practice Admin")
 def index():
-    total_appointments = Appointment.query.count()
-    booked_appointments = Appointment.query.filter_by(status="Booked").count()
-    completed_appointments = Appointment.query.filter_by(status="Completed").count()
-    cancelled_appointments = Appointment.query.filter_by(status="Cancelled").count()
+    try:
+        start_date, end_date = _current_filters()
+        filter_error = ""
+    except ReportFilterError as exc:
+        start_date, end_date = None, None
+        filter_error = str(exc)
 
-    total_prescriptions = Prescription.query.count()
-    pending_prescriptions = Prescription.query.filter(Prescription.status.in_(["Requested", "Under Review"])).count()
-    paid_prescriptions = Prescription.query.filter_by(payment_status="Paid").count()
-
-    latest_appointments = (
-        Appointment.query.join(Appointment.slot)
-        .order_by(AppointmentSlot.start_at.desc())
-        .limit(5)
-        .all()
-    )
-    latest_prescriptions = Prescription.query.order_by(Prescription.created_at.desc()).limit(5).all()
+    summary = build_report_summary(start_date, end_date)
+    latest_appointments = _appointment_export_items(start_date, end_date)[:5]
+    latest_prescriptions = _prescription_export_items(start_date, end_date)[:5]
+    filters = filter_values(start_date, end_date)
 
     return render_template(
         "admin/reports.html",
         total_patients=PatientProfile.query.count(),
         total_staff=StaffProfile.query.count(),
-        total_appointments=total_appointments,
-        booked_appointments=booked_appointments,
-        completed_appointments=completed_appointments,
-        cancelled_appointments=cancelled_appointments,
-        total_prescriptions=total_prescriptions,
-        pending_prescriptions=pending_prescriptions,
-        paid_prescriptions=paid_prescriptions,
+        total_appointments=summary["appointments"],
+        booked_appointments=summary["bookedAppointments"],
+        completed_appointments=summary["completedAppointments"],
+        cancelled_appointments=summary["cancelledAppointments"],
+        pending_approval_appointments=summary["pendingApprovalAppointments"],
+        missed_appointments=summary["missedAppointments"],
+        total_prescriptions=summary["prescriptions"],
+        pending_prescriptions=summary["requestedPrescriptions"] + summary["underReviewPrescriptions"],
+        paid_prescriptions=summary["paidPrescriptions"],
         latest_appointments=latest_appointments,
         latest_prescriptions=latest_prescriptions,
+        filters=filters,
+        filter_error=filter_error,
+        period_label=summary["periodLabel"],
     )
 
 
@@ -66,83 +110,74 @@ def index():
 @login_required
 @role_required("Practice Admin")
 def appointments_csv():
-    appointments = (
-        Appointment.query.join(Appointment.slot)
-        .order_by(AppointmentSlot.start_at.desc())
-        .all()
-    )
+    start_date, end_date = _current_filters()
+    appointments = _appointment_export_items(start_date, end_date)
+    return csv_response("mediqueue_appointments.csv", [APPOINTMENT_CSV_HEADERS] + appointment_rows(appointments))
 
-    rows = [[
-        "Appointment ID",
-        "Date",
-        "Start Time",
-        "End Time",
-        "Patient Name",
-        "Patient Email",
-        "Clinical Staff",
-        "Staff Role",
-        "Reason",
-        "Status",
-        "Created At",
-    ]]
 
-    for appointment in appointments:
-        slot = appointment.slot
+@reports_bp.route("/appointments.pdf")
+@login_required
+@role_required("Practice Admin")
+def appointments_pdf():
+    start_date, end_date = _current_filters()
+    appointments = _appointment_export_items(start_date, end_date)
+    rows = []
+    for row in appointment_rows(appointments):
         rows.append([
-            appointment.id,
-            _format_datetime(slot.start_at, "%Y-%m-%d") if slot else "",
-            _format_datetime(slot.start_at, "%H:%M") if slot else "",
-            _format_datetime(slot.end_at, "%H:%M") if slot else "",
-            appointment.patient_profile.user.full_name,
-            appointment.patient_profile.user.email,
-            appointment.staff_profile.user.full_name,
-            appointment.staff_profile.job_title,
-            appointment.reason or "",
-            appointment.status,
-            _format_datetime(appointment.created_at),
+            row[0],
+            row[1],
+            f"{row[2]}-{row[3]}",
+            row[4],
+            row[6],
+            row[7],
+            row[9],
+            row[8],
         ])
 
-    return _csv_response("mediqueue_appointments.csv", rows)
+    return pdf_response(
+        "mediqueue_appointments.pdf",
+        "MediQueue Appointment Report",
+        f"Reporting period: {report_period_label(start_date, end_date)}",
+        APPOINTMENT_PDF_HEADERS,
+        rows,
+        APPOINTMENT_PDF_WIDTHS,
+    )
 
 
 @reports_bp.route("/prescriptions.csv")
 @login_required
 @role_required("Practice Admin")
 def prescriptions_csv():
-    prescriptions = Prescription.query.order_by(Prescription.created_at.desc()).all()
+    start_date, end_date = _current_filters()
+    prescriptions = _prescription_export_items(start_date, end_date)
+    return csv_response("mediqueue_prescriptions.csv", [PRESCRIPTION_CSV_HEADERS] + prescription_rows(prescriptions))
 
-    rows = [[
-        "Prescription ID",
-        "Requested At",
-        "Patient Name",
-        "Patient Email",
-        "Medicine",
-        "Quantity",
-        "Reason",
-        "Status",
-        "Payment Status",
-        "Amount Due",
-        "Payment Reference",
-        "Reviewed By",
-        "Reviewed At",
-    ]]
 
-    for prescription in prescriptions:
-        reviewer = prescription.reviewed_by_staff.user.full_name if prescription.reviewed_by_staff else ""
+@reports_bp.route("/prescriptions.pdf")
+@login_required
+@role_required("Practice Admin")
+def prescriptions_pdf():
+    start_date, end_date = _current_filters()
+    prescriptions = _prescription_export_items(start_date, end_date)
+    rows = []
+    for row in prescription_rows(prescriptions):
         rows.append([
-            prescription.id,
-            _format_datetime(prescription.created_at),
-            prescription.patient_profile.user.full_name,
-            prescription.patient_profile.user.email,
-            prescription.medicine_name,
-            prescription.quantity,
-            prescription.reason or "",
-            prescription.status,
-            prescription.payment_status,
-            f"{prescription.amount_due:.2f}" if prescription.amount_due else "0.00",
-            prescription.payment_reference or "",
-            reviewer,
-            _format_datetime(prescription.reviewed_at),
+            row[0],
+            row[1],
+            row[2],
+            row[4],
+            row[5],
+            row[7],
+            row[8],
+            row[9],
+            row[11],
         ])
 
-    return _csv_response("mediqueue_prescriptions.csv", rows)
+    return pdf_response(
+        "mediqueue_prescriptions.pdf",
+        "MediQueue Prescription Report",
+        f"Reporting period: {report_period_label(start_date, end_date)}",
+        PRESCRIPTION_PDF_HEADERS,
+        rows,
+        PRESCRIPTION_PDF_WIDTHS,
+    )
