@@ -50,6 +50,8 @@ export interface Appointment {
   reason: string;
   status: AppointmentStatus;
   duration: number;
+  canExportCalendar?: boolean;
+  calendarUrl?: string | null;
 }
 
 export interface Prescription {

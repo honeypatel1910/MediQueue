@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Calendar, Clock, User, AlertCircle } from 'lucide-react';
+import { Search, Calendar, Clock, User, AlertCircle, Download } from 'lucide-react';
 import { apiFetch, postJson } from '../../api';
 import { StatusBadge } from '../shared/StatusBadge';
 import type { Appointment, AppointmentStatus } from '../../types';
@@ -68,6 +68,16 @@ export function AppointmentHistory() {
                 </div>
                 <div className="flex flex-col items-start sm:items-end gap-2">
                   <StatusBadge status={a.status} />
+                  {a.canExportCalendar && (
+                    <a
+                      href={a.calendarUrl || `/api/appointments/${a.id}/calendar`}
+                      download
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                    >
+                      <Download size={14} />
+                      Add to Calendar
+                    </a>
+                  )}
                   {['Booked', 'Pending Approval'].includes(a.status) && new Date(a.date) >= new Date(new Date().toDateString()) && <button onClick={() => setCancelId(a.id)} className="text-sm text-red-600 hover:text-red-700 font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors">Cancel</button>}
                 </div>
               </div>

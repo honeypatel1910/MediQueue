@@ -26,6 +26,8 @@ MediQueue is a secure web-based GP appointment and prescription management syste
 - Simulated prescription payment flow
 - In-app notifications
 - Email notification copies for appointment and prescription alerts
+- Appointment calendar export with iCalendar (.ics) downloads
+- Appointment confirmation emails with .ics calendar attachments
 - Audit logging
 - CSV report exports for appointments and prescriptions
 - JSON API foundation for React authentication
@@ -116,6 +118,15 @@ MAIL_REDIRECT_ALL_TO=your_email@example.com
 ```
 
 If SMTP is unavailable, email sending is safely skipped and the in-app notification still works.
+
+
+## Appointment calendar export
+
+Confirmed appointments can be exported as iCalendar `.ics` files. Patients can download a calendar invite from Appointment History, while doctors and nurses can export their upcoming confirmed schedule from My Schedule. Pending approval, rejected, cancelled, missed, and completed appointments are not exported as active calendar events.
+
+Appointment confirmation emails also include an `.ics` attachment for booked appointments. When an extra appointment request is approved, the patient approval email includes the calendar invite attachment as well.
+
+The export is file-based, so it works with Google Calendar, Outlook, Apple Calendar, and most mobile calendar apps without requiring Google OAuth permissions.
 
 ## Demo accounts
 

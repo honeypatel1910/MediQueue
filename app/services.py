@@ -19,7 +19,7 @@ def notification_emails_enabled():
     return bool(current_app.config.get("MAIL_SEND_NOTIFICATIONS", True))
 
 
-def notify_user(user_id, title, message, *, send_email=True):
+def notify_user(user_id, title, message, *, send_email=True, email_attachments=None):
     """Create an in-app notification and optionally send an email copy.
 
     Email delivery is deliberately best-effort. If SMTP is unavailable or a
@@ -35,7 +35,7 @@ def notify_user(user_id, title, message, *, send_email=True):
             if user and user.active:
                 from app.email_service import send_notification_email
 
-                send_notification_email(user, title, message)
+                send_notification_email(user, title, message, attachments=email_attachments)
         except Exception as exc:  # pragma: no cover - external SMTP safe fallback
             current_app.logger.warning(
                 "Notification email failed for user_id=%s title=%s: %s",
@@ -286,15 +286,19 @@ def book_appointment(patient_profile, slot_id, reason=""):
             f"Pending approval for slot {slot.start_at.strftime('%Y-%m-%d %H:%M')} with {slot.staff_profile.user.full_name}",
         )
     else:
+        from app.calendar_exports import appointment_ics_attachment
+
         notify_user(
             patient_profile.user_id,
             "Appointment booked",
-            f"Your appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')} has been booked.",
+            f"Your appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')} has been booked. A calendar invite is attached to this email notification.",
+            email_attachments=[appointment_ics_attachment(appointment, audience="patient")],
         )
         notify_user(
             slot.staff_profile.user_id,
             "New appointment booked",
-            f"A patient booked an appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')}.",
+            f"A patient booked an appointment on {slot.start_at.strftime('%d %b %Y')} at {slot.start_at.strftime('%H:%M')}. A calendar invite is attached to this email notification.",
+            email_attachments=[appointment_ics_attachment(appointment, audience="staff")],
         )
         log_action(
             "Appointment booked",
@@ -348,10 +352,13 @@ def approve_extra_appointment(appointment):
 
     appointment.status = "Booked"
     appointment.slot.status = "Booked"
+    from app.calendar_exports import appointment_ics_attachment
+
     notify_user(
         appointment.patient_profile.user_id,
         "Extra appointment approved",
-        f"Your extra appointment request on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was approved.",
+        f"Your extra appointment request on {appointment.slot.start_at.strftime('%d %b %Y')} at {appointment.slot.start_at.strftime('%H:%M')} was approved. A calendar invite is attached to this email notification.",
+        email_attachments=[appointment_ics_attachment(appointment, audience="patient")],
     )
     log_action(
         "Extra appointment approved",

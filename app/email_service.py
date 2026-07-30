@@ -19,7 +19,7 @@ def _plain_text_from_html(html_body: str) -> str:
     )
 
 
-def send_email(to_email, subject, text_body=None, html_body=None):
+def send_email(to_email, subject, text_body=None, html_body=None, attachments=None):
     """Send an email through configured SMTP settings.
 
     The function is intentionally safe for development: if SMTP is not
@@ -65,6 +65,34 @@ def send_email(to_email, subject, text_body=None, html_body=None):
 
     if html_body:
         message.add_alternative(html_body, subtype="html")
+
+    for attachment in attachments or []:
+        filename = attachment.get("filename") or "attachment.txt"
+        content = attachment.get("content") or ""
+        mime_type = attachment.get("mime_type") or "application/octet-stream"
+        maintype, _, subtype = mime_type.partition("/")
+        subtype = subtype or "octet-stream"
+
+        if isinstance(content, bytes):
+            message.add_attachment(
+                content,
+                maintype=maintype,
+                subtype=subtype,
+                filename=filename,
+            )
+        elif maintype == "text":
+            message.add_attachment(
+                str(content),
+                subtype=subtype,
+                filename=filename,
+            )
+        else:
+            message.add_attachment(
+                str(content).encode("utf-8"),
+                maintype=maintype,
+                subtype=subtype,
+                filename=filename,
+            )
 
     try:
         if current_app.config.get("MAIL_USE_SSL", False):
@@ -115,7 +143,7 @@ def send_registration_otp_email(user, otp_code, expires_in_minutes=10):
     )
 
 
-def send_notification_email(user, title, message):
+def send_notification_email(user, title, message, attachments=None):
     """Send an email copy of an in-app notification to one user."""
     if user is None or not getattr(user, "email", None):
         return False
@@ -146,4 +174,5 @@ def send_notification_email(user, title, message):
         f"MediQueue notification: {title}",
         text_body=text_body,
         html_body=html_body,
+        attachments=attachments,
     )

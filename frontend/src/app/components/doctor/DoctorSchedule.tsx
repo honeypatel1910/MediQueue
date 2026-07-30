@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, Calendar, CheckCircle2, Clock, Search, User } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, Clock, Search, User, Download } from 'lucide-react';
 import { apiFetch, postJson } from '../../api';
 import { StatusBadge } from '../shared/StatusBadge';
 import type { Appointment, AppointmentStatus } from '../../types';
@@ -73,11 +73,21 @@ export function DoctorSchedule({ staffName }: { staffName: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <p className="font-semibold text-slate-900">Schedule for {staffName}</p>
-        <p className="text-sm text-slate-500">
-          Update appointments and approve or reject extra appointment requests.
-        </p>
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-semibold text-slate-900">Schedule for {staffName}</p>
+          <p className="text-sm text-slate-500">
+            Update appointments, approve extra appointment requests, and export confirmed bookings to calendar.
+          </p>
+        </div>
+        <a
+          href="/api/staff/schedule/calendar"
+          download
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+        >
+          <Download size={16} />
+          Export Schedule
+        </a>
       </div>
 
       {message && (
@@ -146,6 +156,16 @@ export function DoctorSchedule({ staffName }: { staffName: string }) {
 
               <div className="flex flex-col gap-2 sm:items-end">
                 <StatusBadge status={a.status} />
+                {a.canExportCalendar && (
+                  <a
+                    href={a.calendarUrl || `/api/appointments/${a.id}/calendar`}
+                    download
+                    className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                  >
+                    <Download size={13} />
+                    Calendar
+                  </a>
+                )}
                 {a.status === 'Pending Approval' ? (
                   <div className="flex flex-wrap gap-2">
                     <button

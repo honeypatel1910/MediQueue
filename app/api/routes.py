@@ -5,6 +5,13 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 
+from app.calendar_exports import (
+    appointment_calendar_filename,
+    appointment_is_calendar_exportable,
+    build_appointment_ics,
+    build_appointments_ics,
+    ics_download_response,
+)
 from app.email_verification import (
     email_is_verified,
     issue_registration_otp,
@@ -143,6 +150,8 @@ def appointment_json(appointment):
         "reason": appointment.reason or "",
         "status": appointment.status,
         "duration": duration,
+        "canExportCalendar": appointment_is_calendar_exportable(appointment),
+        "calendarUrl": f"/api/appointments/{appointment.id}/calendar" if appointment_is_calendar_exportable(appointment) else None,
     }
 
 
@@ -777,6 +786,69 @@ def appointments():
         return json_error("Access denied.", 403)
 
     return jsonify({"ok": True, "appointments": [appointment_json(item) for item in items]})
+
+
+def _user_can_access_appointment(appointment):
+    """Return whether the current user can access this appointment record."""
+    if current_user.has_role("Patient"):
+        return appointment.patient_profile and appointment.patient_profile.user_id == current_user.id
+    if current_user.has_role("Doctor", "Nurse"):
+        return appointment.staff_profile and appointment.staff_profile.user_id == current_user.id
+    if current_user.has_role("Practice Admin"):
+        return True
+    return False
+
+
+@api_bp.get("/appointments/<int:appointment_id>/calendar")
+@login_required
+def appointment_calendar_export(appointment_id):
+    """Download one confirmed appointment as an iCalendar .ics file."""
+    appointment = Appointment.query.get_or_404(appointment_id)
+
+    if not _user_can_access_appointment(appointment):
+        return json_error("You do not have permission to export this appointment.", 403)
+
+    if not appointment_is_calendar_exportable(appointment):
+        return json_error("Only confirmed booked appointments can be exported to calendar.", 400)
+
+    audience = "staff" if current_user.has_role("Doctor", "Nurse", "Practice Admin") else "patient"
+    ics_content = build_appointment_ics(appointment, audience=audience)
+    return ics_download_response(ics_content, appointment_calendar_filename(appointment))
+
+
+@api_bp.get("/staff/schedule/calendar")
+@login_required
+def staff_schedule_calendar_export():
+    """Download the logged-in doctor/nurse upcoming booked schedule as a .ics file."""
+    if not current_user.has_role("Doctor", "Nurse"):
+        return json_error("Staff access required.", 403)
+
+    staff = current_user.staff_profile
+    if staff is None:
+        return json_error("Staff profile was not found.", 404)
+
+    query = (
+        Appointment.query.filter_by(staff_profile_id=staff.id)
+        .join(AppointmentSlot, Appointment.appointment_slot_id == AppointmentSlot.id)
+        .filter(Appointment.status == "Booked")
+        .filter(AppointmentSlot.start_at >= datetime.now())
+    )
+
+    from_date = (request.args.get("from") or "").strip()
+    to_date = (request.args.get("to") or "").strip()
+    try:
+        if from_date:
+            start_date = date.fromisoformat(from_date)
+            query = query.filter(AppointmentSlot.start_at >= datetime.combine(start_date, time.min))
+        if to_date:
+            end_date = date.fromisoformat(to_date)
+            query = query.filter(AppointmentSlot.start_at <= datetime.combine(end_date, time.max))
+    except ValueError:
+        return json_error("Please provide valid calendar export dates.", 400)
+
+    appointments = query.order_by(AppointmentSlot.start_at.asc()).limit(500).all()
+    ics_content = build_appointments_ics(appointments, audience="staff")
+    return ics_download_response(ics_content, "mediqueue-upcoming-schedule.ics")
 
 
 @api_bp.post("/appointments/<int:appointment_id>/cancel")
