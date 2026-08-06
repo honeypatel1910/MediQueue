@@ -143,6 +143,33 @@ def send_registration_otp_email(user, otp_code, expires_in_minutes=10):
     )
 
 
+def send_password_reset_otp_email(user, otp_code, expires_in_minutes=10):
+    """Email a password reset OTP to a registered user."""
+    safe_name = escape(getattr(user, "first_name", None) or "MediQueue user")
+    text_body = (
+        f"Hello {getattr(user, 'first_name', None) or 'MediQueue user'},\n\n"
+        f"Your MediQueue password reset code is: {otp_code}\n\n"
+        f"This code expires in {expires_in_minutes} minutes.\n\n"
+        "If you did not request a password reset, please ignore this email and keep your existing password."
+    )
+    html_body = f"""
+    <div style=\"font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6;\">
+      <h2 style=\"color: #2563eb;\">MediQueue password reset</h2>
+      <p>Hello {safe_name},</p>
+      <p>Your password reset code is:</p>
+      <p style=\"font-size: 28px; font-weight: 700; letter-spacing: 6px; color: #0f172a;\">{otp_code}</p>
+      <p>This code expires in <strong>{expires_in_minutes} minutes</strong>.</p>
+      <p>If you did not request a password reset, please ignore this email and keep your existing password.</p>
+    </div>
+    """
+    return send_email(
+        user.email,
+        "Your MediQueue password reset code",
+        text_body=text_body,
+        html_body=html_body,
+    )
+
+
 def send_notification_email(user, title, message, attachments=None):
     """Send an email copy of an in-app notification to one user."""
     if user is None or not getattr(user, "email", None):

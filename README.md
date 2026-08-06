@@ -191,3 +191,32 @@ npm run dev
 ```
 
 The Vite development server proxies `/api` and `/reports` requests to the Flask backend.
+
+## Secure forgot password flow
+
+MediQueue includes a secure password reset workflow using the same email OTP infrastructure as registration verification.
+
+Flow:
+
+```text
+User clicks Forgot password
+User enters registered email
+System sends a 6-digit password reset OTP
+User verifies OTP
+User enters new password and retypes the new password
+System updates the stored password hash
+User signs in with the new password
+```
+
+The application validates password confirmation in both React and Flask/API routes. Password reset OTP values are never stored as plain text; they are hashed in the `email_verifications` table with purpose `password_reset`. Once the password has been reset, the OTP record is marked as used so the same OTP cannot be reused.
+
+The reset email uses the same SMTP configuration as registration OTP emails:
+
+```text
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=true
+MAIL_USERNAME=your_email@example.com
+MAIL_PASSWORD=your_email_app_password
+EMAIL_OTP_EXPIRY_MINUTES=10
+```

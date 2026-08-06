@@ -106,6 +106,14 @@ export function LoginPage() {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage('forgot-password')}
+              className="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              Forgot password?
+            </button>
           </form>
         </div>
 

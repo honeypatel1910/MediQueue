@@ -14,8 +14,11 @@ from app.calendar_exports import (
 )
 from app.email_verification import (
     email_is_verified,
+    issue_password_reset_otp,
     issue_registration_otp,
     resend_registration_otp,
+    reset_password_after_otp,
+    verify_password_reset_otp,
     verify_registration_otp,
 )
 from app.extensions import csrf, db
@@ -346,6 +349,7 @@ def register():
     last_name = (data.get("lastName") or data.get("last_name") or "").strip()
     email = (data.get("email") or "").lower().strip()
     password = data.get("password") or ""
+    confirm_password = data.get("confirmPassword") or data.get("confirm_password") or ""
     phone = (data.get("phone") or "").strip()
     address = (data.get("address") or "").strip()
 
@@ -354,6 +358,9 @@ def register():
 
     if len(password) < 8:
         return json_error("Password must be at least 8 characters long.")
+
+    if password != confirm_password:
+        return json_error("Password and retype password do not match.")
 
     if User.query.filter_by(email=email).first():
         return json_error("This email is already registered.")
@@ -437,6 +444,57 @@ def resend_email_otp():
         db.session.commit()
 
     return jsonify({"ok": True, "message": message, "emailSent": email_sent})
+
+
+@api_bp.post("/password-reset/request")
+def request_password_reset():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email") or ""
+
+    success, message, email_sent, user = issue_password_reset_otp(email)
+    if user:
+        log_action("Password reset OTP requested", "User", user.id, "Password reset OTP requested through API", user_id=user.id)
+    db.session.commit()
+
+    if not success:
+        return json_error(message, 400)
+
+    return jsonify({"ok": True, "message": message, "emailSent": email_sent})
+
+
+@api_bp.post("/password-reset/verify")
+def verify_password_reset():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email") or ""
+    otp_code = data.get("otp") or data.get("otpCode") or ""
+
+    success, message, user = verify_password_reset_otp(email, otp_code)
+    if user:
+        log_action("Password reset OTP verified", "User", user.id, "Password reset OTP verified through API", user_id=user.id)
+    db.session.commit()
+
+    if not success:
+        return json_error(message, 400)
+
+    return jsonify({"ok": True, "message": message})
+
+
+@api_bp.post("/password-reset/confirm")
+def confirm_password_reset():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email") or ""
+    new_password = data.get("password") or data.get("newPassword") or ""
+    confirm_password = data.get("confirmPassword") or data.get("confirm_password") or ""
+
+    success, message, user = reset_password_after_otp(email, new_password, confirm_password)
+    if user:
+        log_action("Password reset completed", "User", user.id, "User reset password after OTP verification", user_id=user.id)
+    db.session.commit()
+
+    if not success:
+        return json_error(message, 400)
+
+    return jsonify({"ok": True, "message": message})
 
 
 @api_bp.get("/patient/dashboard")

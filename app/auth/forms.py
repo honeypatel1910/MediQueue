@@ -18,7 +18,7 @@ class RegistrationForm(FlaskForm):
     email = StringField("Email address", validators=[DataRequired(), Email(), Length(max=255)])
     password = PasswordField("Password", validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField(
-        "Confirm password",
+        "Retype password",
         validators=[DataRequired(), EqualTo("password", message="Passwords must match.")],
     )
     submit = SubmitField("Create patient account")
@@ -27,3 +27,24 @@ class RegistrationForm(FlaskForm):
         existing_user = User.query.filter_by(email=email.data.lower().strip()).first()
         if existing_user:
             raise ValidationError("An account with this email already exists.")
+
+
+class PasswordResetRequestForm(FlaskForm):
+    email = StringField("Registered email address", validators=[DataRequired(), Email(), Length(max=255)])
+    submit = SubmitField("Send reset OTP")
+
+
+class PasswordResetVerifyForm(FlaskForm):
+    email = StringField("Registered email address", validators=[DataRequired(), Email(), Length(max=255)])
+    otp = StringField("6-digit OTP", validators=[DataRequired(), Length(min=6, max=6)])
+    submit = SubmitField("Verify OTP")
+
+
+class PasswordResetConfirmForm(FlaskForm):
+    email = StringField("Registered email address", validators=[DataRequired(), Email(), Length(max=255)])
+    password = PasswordField("New password", validators=[DataRequired(), Length(min=8)])
+    confirm_password = PasswordField(
+        "Retype new password",
+        validators=[DataRequired(), EqualTo("password", message="Passwords must match.")],
+    )
+    submit = SubmitField("Reset password")

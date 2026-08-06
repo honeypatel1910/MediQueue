@@ -1,8 +1,20 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
-from app.auth.forms import LoginForm, RegistrationForm
-from app.email_verification import email_is_verified, issue_registration_otp
+from app.auth.forms import (
+    LoginForm,
+    PasswordResetConfirmForm,
+    PasswordResetRequestForm,
+    PasswordResetVerifyForm,
+    RegistrationForm,
+)
+from app.email_verification import (
+    email_is_verified,
+    issue_password_reset_otp,
+    issue_registration_otp,
+    reset_password_after_otp,
+    verify_password_reset_otp,
+)
 from app.extensions import db
 from app.models import PatientProfile, Role, User
 from app.services import log_action
@@ -86,6 +98,79 @@ def register():
         return redirect(url_for("index"))
 
     return render_template("auth/register.html", form=form)
+
+
+@bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if current_user.is_authenticated:
+        return _post_login_redirect(current_user)
+
+    form = PasswordResetRequestForm()
+    if form.validate_on_submit():
+        success, message, email_sent, user = issue_password_reset_otp(form.email.data)
+        if user:
+            log_action("Password reset OTP requested", "User", user.id, "Password reset OTP requested", user_id=user.id)
+        db.session.commit()
+
+        flash(message, "info")
+        if success:
+            return redirect(url_for("auth.verify_password_reset", email=form.email.data.lower().strip()))
+
+    return render_template("auth/forgot_password.html", form=form)
+
+
+@bp.route("/forgot-password/verify", methods=["GET", "POST"])
+def verify_password_reset():
+    if current_user.is_authenticated:
+        return _post_login_redirect(current_user)
+
+    form = PasswordResetVerifyForm()
+    email = request.args.get("email") or ""
+    if request.method == "GET" and email:
+        form.email.data = email.lower().strip()
+
+    if form.validate_on_submit():
+        success, message, user = verify_password_reset_otp(form.email.data, form.otp.data)
+        if user:
+            log_action("Password reset OTP verified", "User", user.id, "Password reset OTP verified", user_id=user.id)
+        db.session.commit()
+
+        if success:
+            flash(message, "success")
+            return redirect(url_for("auth.reset_password", email=form.email.data.lower().strip()))
+
+        flash(message, "danger")
+
+    return render_template("auth/forgot_password_verify.html", form=form)
+
+
+@bp.route("/forgot-password/reset", methods=["GET", "POST"])
+def reset_password():
+    if current_user.is_authenticated:
+        return _post_login_redirect(current_user)
+
+    form = PasswordResetConfirmForm()
+    email = request.args.get("email") or ""
+    if request.method == "GET" and email:
+        form.email.data = email.lower().strip()
+
+    if form.validate_on_submit():
+        success, message, user = reset_password_after_otp(
+            form.email.data,
+            form.password.data,
+            form.confirm_password.data,
+        )
+        if user:
+            log_action("Password reset completed", "User", user.id, "User reset password after OTP verification", user_id=user.id)
+        db.session.commit()
+
+        if success:
+            flash(message, "success")
+            return redirect(url_for("auth.login"))
+
+        flash(message, "danger")
+
+    return render_template("auth/forgot_password_reset.html", form=form)
 
 
 @bp.route("/logout")

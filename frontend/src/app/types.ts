@@ -125,6 +125,7 @@ export type Page =
   | 'login'
   | 'register'
   | 'verify-email'
+  | 'forgot-password'
   | 'patient-dashboard'
   | 'book-appointment'
   | 'appointment-history'
