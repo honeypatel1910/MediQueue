@@ -220,3 +220,26 @@ MAIL_USERNAME=your_email@example.com
 MAIL_PASSWORD=your_email_app_password
 EMAIL_OTP_EXPIRY_MINUTES=10
 ```
+
+## Automated testing
+
+MediQueue uses Pytest for backend and API testing. The test suite starts the
+Flask application with `TestConfig`, creates a fresh in-memory SQLite database,
+and suppresses outgoing email. It does not connect to or modify the normal
+PostgreSQL database configured in `.env`.
+
+Install the project and testing dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the complete backend test suite from the MediQueue project root:
+
+```bash
+pytest -v
+```
+
+The first testing foundation validates the application health endpoints and
+confirms that the complete database schema can be created safely in the isolated
+test database.

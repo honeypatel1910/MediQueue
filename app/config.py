@@ -5,6 +5,7 @@ from pathlib import Path
 def _env_bool(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -60,6 +61,19 @@ class Config:
 
 
 class TestConfig(Config):
+    """Safe, isolated configuration used only by the automated test suite."""
+
     TESTING = True
+    SECRET_KEY = "mediqueue-test-secret-key"
     WTF_CSRF_ENABLED = False
+
+    # Tests use a temporary in-memory SQLite database. The normal PostgreSQL
+    # database configured in .env is never opened or modified.
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_ENGINE_OPTIONS = {}
+
+    # Automated tests must never send real registration, password reset,
+    # appointment, or prescription emails.
+    MAIL_SUPPRESS_SEND = True
+    MAIL_SEND_NOTIFICATIONS = False
+    MAIL_REDIRECT_ALL_TO = ""
