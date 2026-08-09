@@ -3,8 +3,10 @@
 import pytest
 
 from app import create_app
+from app import email_verification
 from app.config import TestConfig
 from app.extensions import db
+from app.models import PatientProfile, Role, User
 
 
 @pytest.fixture()
@@ -32,3 +34,105 @@ def client(app):
 def runner(app):
     """Provide a runner for testing Flask CLI commands in later chunks."""
     return app.test_cli_runner()
+
+
+@pytest.fixture()
+def make_patient(app):
+    """Create a verified-style patient account directly in the isolated test DB.
+
+    Users created by this fixture have no registration OTP record. MediQueue treats
+    such pre-existing/seeded patient accounts as already verified, matching the
+    application's demo-user behaviour.
+    """
+
+    def _make_patient(
+        email="patient.test@example.com",
+        password="StrongPass123!",
+        first_name="Test",
+        last_name="Patient",
+        active=True,
+    ):
+        with app.app_context():
+            role = Role.query.filter_by(name="Patient").first()
+            if role is None:
+                role = Role(
+                    name="Patient",
+                    description="Patient user who can access patient services.",
+                )
+                db.session.add(role)
+                db.session.flush()
+
+            user = User(
+                email=email.lower().strip(),
+                first_name=first_name,
+                last_name=last_name,
+                role=role,
+                active=active,
+            )
+            user.set_password(password)
+            db.session.add(user)
+            db.session.flush()
+
+            db.session.add(
+                PatientProfile(
+                    user_id=user.id,
+                    patient_reference=f"MQP-TEST-{user.id:05d}",
+                )
+            )
+            db.session.commit()
+
+            return {
+                "id": user.id,
+                "email": user.email,
+                "password": password,
+            }
+
+    return _make_patient
+
+
+@pytest.fixture()
+def mocked_otp_delivery(monkeypatch):
+    """Use a deterministic OTP and replace real email delivery with test doubles.
+
+    This is a *mock*: no SMTP connection is made. The fixture records what the
+    application attempted to send so tests can verify the intended behaviour.
+    """
+    sent = {
+        "registration": [],
+        "password_reset": [],
+    }
+
+    monkeypatch.setattr(email_verification, "generate_otp_code", lambda: "123456")
+
+    def fake_registration_email(user, otp_code, expires_in_minutes=10):
+        sent["registration"].append(
+            {
+                "email": user.email,
+                "otp": otp_code,
+                "expires_in_minutes": expires_in_minutes,
+            }
+        )
+        return True
+
+    def fake_password_reset_email(user, otp_code, expires_in_minutes=10):
+        sent["password_reset"].append(
+            {
+                "email": user.email,
+                "otp": otp_code,
+                "expires_in_minutes": expires_in_minutes,
+            }
+        )
+        return True
+
+    monkeypatch.setattr(
+        email_verification,
+        "send_registration_otp_email",
+        fake_registration_email,
+    )
+    monkeypatch.setattr(
+        email_verification,
+        "send_password_reset_otp_email",
+        fake_password_reset_email,
+    )
+
+    return sent
