@@ -6,7 +6,7 @@ from app import create_app
 from app import email_verification
 from app.config import TestConfig
 from app.extensions import db
-from app.models import PatientProfile, Role, User
+from app.models import PatientProfile, Role, StaffProfile, User
 
 
 @pytest.fixture()
@@ -136,3 +136,76 @@ def mocked_otp_delivery(monkeypatch):
     )
 
     return sent
+
+
+@pytest.fixture()
+def make_role_user(app):
+    """Create a temporary account for any MediQueue role.
+
+    Patient accounts receive a PatientProfile. Doctor and Nurse accounts receive
+    a StaffProfile. Practice Admin accounts need only the core User record.
+    Every account exists only inside the isolated test database.
+    """
+
+    def _make_role_user(
+        role_name,
+        email=None,
+        password="StrongPass123!",
+        first_name="Test",
+        last_name="User",
+        active=True,
+    ):
+        allowed_roles = {"Patient", "Doctor", "Nurse", "Practice Admin"}
+        if role_name not in allowed_roles:
+            raise ValueError(f"Unsupported MediQueue role: {role_name}")
+
+        with app.app_context():
+            role = Role.query.filter_by(name=role_name).first()
+            if role is None:
+                role = Role(
+                    name=role_name,
+                    description=f"Temporary {role_name} role for automated testing.",
+                )
+                db.session.add(role)
+                db.session.flush()
+
+            safe_role = role_name.lower().replace(" ", ".")
+            user_email = (email or f"{safe_role}.test@example.com").lower().strip()
+
+            user = User(
+                email=user_email,
+                first_name=first_name,
+                last_name=last_name,
+                role=role,
+                active=active,
+            )
+            user.set_password(password)
+            db.session.add(user)
+            db.session.flush()
+
+            if role_name == "Patient":
+                db.session.add(
+                    PatientProfile(
+                        user_id=user.id,
+                        patient_reference=f"MQP-RBAC-{user.id:05d}",
+                    )
+                )
+            elif role_name in {"Doctor", "Nurse"}:
+                db.session.add(
+                    StaffProfile(
+                        user_id=user.id,
+                        job_title=role_name,
+                        department="General Practice",
+                    )
+                )
+
+            db.session.commit()
+
+            return {
+                "id": user.id,
+                "email": user.email,
+                "password": password,
+                "role": role_name,
+            }
+
+    return _make_role_user
